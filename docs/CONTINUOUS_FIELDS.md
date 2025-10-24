@@ -293,8 +293,8 @@ Result: User sees a **continuous landscape** with ridges and valleys, not discre
 ```bash
 # Convert old ego graphs to new format
 uv run python scripts/migrate_to_continuous_fields.py \
-  --input fixtures/ego_graphs/fronx_v01.json \
-  --output fixtures/ego_graphs/fronx_v02.json
+  --input data/ego_graphs/fronx_v01.json \
+  --output data/ego_graphs/fronx_v02.json
 ```
 
 **Alternative**: Keep v0.1 implementation in `src/ego_ops_legacy.py` for comparison.

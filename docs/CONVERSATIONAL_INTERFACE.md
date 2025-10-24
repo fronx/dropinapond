@@ -57,7 +57,7 @@ Claude: [After more conversation...]
 
         Let me update your ego graph and see what insights come up.
 
-        [Claude writes to fixtures/ego_graphs/justin.json]
+        [Claude writes to data/ego_graphs/justin.json]
         [Claude computes embeddings via ChromaDB]
         [Claude runs: uv run python src/ego_ops.py justin]
 
@@ -93,7 +93,7 @@ Claude: [After more conversation...]
 
 ## File Structure
 
-Your ego graph is saved as `fixtures/ego_graphs/{name}.json`:
+Your ego graph is saved as `data/ego_graphs/{name}.json`:
 
 ```json
 {
@@ -167,12 +167,10 @@ Low attunement + high legibility = learning opportunity.
 ## Privacy
 
 Your ego graph:
-- Lives on your local machine (`fixtures/ego_graphs/`)
+- Lives on your local machine (`data/ego_graphs/`)
 - Is gitignored by default (won't be committed)
 - Never leaves your machine unless you explicitly share it
 - Contains only your perceptions of others (not their ground truth)
-
-The example fixture ([fronx.json](../fixtures/ego_graphs/fronx.json)) is the only committed graph - it's for demonstration purposes.
 
 ## Updating Your Graph
 

@@ -13,7 +13,7 @@
   - Translation vectors
   - Orientation scores
 - [x] Keyphrase translation hints
-- [x] Example fixture ([fronx.json](../fixtures/ego_graphs/fronx.json)) with 8 people, 2 clusters
+- [x] Example fixture ([fronx.json](../data/ego_graphs/fronx.json)) with 8 people, 2 clusters
 - [x] Command-line runner for analysis
 - [x] Dependencies managed with `uv`
 
@@ -335,8 +335,8 @@ if __name__ == '__main__':
 
 ```bash
 uv run python scripts/compute_embeddings.py \
-  fixtures/ego_graphs/my_graph_plaintext.json \
-  fixtures/ego_graphs/my_graph.json
+  data/ego_graphs/my_graph_plaintext.json \
+  data/ego_graphs/my_graph.json
 ```
 
 ## Building the Conversational Interface
@@ -440,7 +440,7 @@ def test_cosine_similarity():
 
 def test_cluster_detection():
     # Load fixture
-    ego_data = EgoData.from_json('fixtures/ego_graphs/fronx.json')
+    ego_data = EgoData.from_json('data/ego_graphs/fronx.json')
 
     # Compute clusters
     clusters, overlaps, attention = compute_ego_picture(ego_data, n_clusters=3)
@@ -461,7 +461,7 @@ uv run pytest tests/
 Create additional fixtures with known properties:
 
 ```json
-// fixtures/ego_graphs/test_perfect_clusters.json
+// data/ego_graphs/test_perfect_clusters.json
 // Two perfectly separated clusters, no overlap
 // Expected: overlap ≈ 0.5 for each, attention entropy ≈ 1.0
 ```

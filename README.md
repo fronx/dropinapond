@@ -30,7 +30,7 @@ uv sync
 uv run python src/ego_ops.py fronx
 ```
 
-This analyzes the [example ego graph](fixtures/ego_graphs/fronx.json) and outputs all navigation metrics.
+This analyzes the [example ego graph](data/ego_graphs/fronx.json) and outputs all navigation metrics.
 
 ## Documentation
 
@@ -67,7 +67,7 @@ See [Architecture](docs/ARCHITECTURE.md) for detailed explanations and [Continuo
 
 ## Ego Graph Format (v0.2 - Continuous Fields)
 
-Define your network in `fixtures/ego_graphs/<name>.json`:
+Define your network in `data/ego_graphs/<name>.json`:
 
 ```json
 {

@@ -19,7 +19,7 @@ uv run python src/ego_ops.py fronx
 
 # Run analysis on a different ego graph
 uv run python src/ego_ops.py <graph_name>
-# (looks for fixtures/ego_graphs/<graph_name>.json)
+# (looks for data/ego_graphs/<graph_name>.json)
 ```
 
 ### Ego Graph Building Sessions
@@ -85,7 +85,7 @@ All metrics operate on continuous semantic fields using kernel methods:
 
 **src/translation_hints.py** (1.6KB): Finds lexical bridges between people's vocabularies using phrase-level semantic alignment
 
-**fixtures/ego_graphs/*.json**: Example ego graph data files
+**data/ego_graphs/*.json**: Example ego graph data files
 
 ### Data Format (v0.2 - Phrase-Level with ChromaDB)
 

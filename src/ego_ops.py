@@ -10,6 +10,7 @@ import networkx as nx
 from scipy.linalg import expm
 from scipy.stats import entropy as shannon_entropy
 from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
 
 # ---------------------------
 # Core data structure
@@ -49,16 +50,21 @@ class EgoData:
             if len(e) == 2:
                 u, v = e
                 w = 1.0
+                attrs = {}
             else:
                 u, v, dims = e
                 if dims is None:
                     w = 1.0
+                    attrs = {}
                 elif isinstance(dims, dict):
                     w = dims.get(edge_dim, dims.get('potential', 1.0))
+                    # Preserve ALL edge attributes
+                    attrs = dims.copy()
                 else:
                     w = float(dims)
+                    attrs = {}
             if u in G and v in G:
-                G.add_edge(u, v, weight=float(w))
+                G.add_edge(u, v, weight=float(w), **attrs)
         return G
 
     def Z(self, subset: Optional[Iterable[str]] = None) -> np.ndarray:
@@ -546,7 +552,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     name = sys.argv[1]
-    fixture_path = Path(__file__).parent.parent / "fixtures" / "ego_graphs" / f"{name}.json"
+    fixture_path = Path(__file__).parent.parent / "data" / "ego_graphs" / f"{name}.json"
 
     # Import and initialize embedding service
     from embeddings import get_embedding_service
@@ -567,10 +573,7 @@ if __name__ == "__main__":
 
     # 1) Ego picture
     overlaps = {j: jaccard_overlap(G, F, j) for j in neighbors}
-    clusters = ego_clusters(G, F)  # expect [{L,P,K}, {S,T,R}, optionally {B}] depending on edges
-    # Ensure B is assigned: put singleton cluster if needed
-    if not any("B" in C for C in clusters):
-        clusters.append({"B"})
+    clusters = ego_clusters(G, F)
     # Entropy of attention across clusters
     H = tie_weight_entropy(G, F, clusters)
 
@@ -632,3 +635,97 @@ if __name__ == "__main__":
     print("\nOrientation scores (higher is better):", {format_node(j): round(scores[j],3) for j in neighbors})
     best = max(scores, key=scores.__getitem__)
     print(f"\nBest next approach: {format_node(best)}")
+
+    # Visualization
+    print("\nGenerating visualization...")
+
+    # Define colors for clusters
+    cluster_colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F']
+
+    # Assign colors to nodes based on cluster
+    node_colors = {}
+    for k, cluster in enumerate(clusters):
+        color = cluster_colors[k % len(cluster_colors)]
+        for node in cluster:
+            node_colors[node] = color
+
+    # Focal node gets special color
+    node_colors[F] = '#E74C3C'
+
+    # Create figure
+    plt.figure(figsize=(14, 10))
+
+    # Use spring layout for positioning
+    pos = nx.spring_layout(G, k=2.0, iterations=50, seed=42)
+
+    # Draw edges with varying thickness based on actual weight
+    for u, v in G.edges():
+        # Use actual weight if it exists, otherwise default to thin line
+        if u == F or v == F:
+            actual = G[u][v].get('actual', 0.3)
+            # Scale thickness VERY dramatically: 0.2 -> 2, 0.9 -> 20
+            width = 2.0 + actual * 20.0
+            print(f"Edge {format_node(u)} -> {format_node(v)}: actual={actual:.2f}, width={width:.1f}")
+        else:
+            # Non-focal edges are thinner
+            width = 0.5
+        nx.draw_networkx_edges(G, pos, edgelist=[(u, v)],
+                               width=width, alpha=0.6, edge_color='gray')
+
+    # Draw nodes
+    for node in G.nodes():
+        color = node_colors.get(node, 'lightgray')
+        size = 3000 if node == F else 1500
+        nx.draw_networkx_nodes(G, pos, nodelist=[node],
+                               node_color=color, node_size=size,
+                               edgecolors='black', linewidths=2)
+
+    # Draw node labels
+    labels = {node: format_node(node).split(' (')[0] for node in G.nodes()}
+    nx.draw_networkx_labels(G, pos, labels, font_size=10, font_weight='bold')
+
+    # Draw edge labels with channels and orientation scores
+    edge_labels = {}
+    for u, v in G.edges():
+        parts = []
+
+        # Add channels if edge involves focal node
+        if u == F or v == F:
+            channels = G[u][v].get('channels', [])
+            if channels:
+                channel_str = ', '.join(channels)
+                parts.append(f"📡 {channel_str}")
+
+            # Add actual strength
+            actual = G[u][v].get('actual')
+            if actual is not None:
+                parts.append(f"💪 {actual:.1f}")
+
+            # Add orientation score for neighbor
+            neighbor = v if u == F else u
+            if neighbor in scores:
+                parts.append(f"🎯 {scores[neighbor]:.2f}")
+
+        if parts:
+            edge_labels[(u, v)] = '\n'.join(parts)
+
+    nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=7,
+                                  bbox=dict(boxstyle='round,pad=0.3',
+                                           facecolor='white', alpha=0.8))
+
+    # Add legend for clusters
+    from matplotlib.patches import Patch
+    legend_elements = []
+    legend_elements.append(Patch(facecolor='#E74C3C', edgecolor='black', label=f'Focal: {format_node(F)}'))
+    for k, cluster in enumerate(clusters):
+        color = cluster_colors[k % len(cluster_colors)]
+        cluster_names = [format_node(n).split(' (')[0] for n in sorted(cluster)]
+        label = f"Cluster {k+1}: {', '.join(cluster_names)}"
+        legend_elements.append(Patch(facecolor=color, edgecolor='black', label=label))
+
+    plt.legend(handles=legend_elements, loc='upper left', fontsize=9)
+    plt.title(f"Ego Graph: {format_node(F)}\nBest next interaction: {format_node(best)} (score: {scores[best]:.2f})\n\n📡 = channels | 💪 = connection strength | 🎯 = orientation score",
+              fontsize=12, fontweight='bold')
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()

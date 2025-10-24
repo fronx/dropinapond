@@ -30,10 +30,8 @@ env/
 chroma_db/
 
 # User ego graphs (keep private)
-# Note: fronx.json is an example fixture and is committed
-fixtures/ego_graphs/*
-!fixtures/ego_graphs/fronx.json
-!fixtures/ego_graphs/.gitkeep
+data/ego_graphs/*
+!data/ego_graphs/.gitkeep
 
 # IDEs
 .vscode/

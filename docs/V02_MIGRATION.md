@@ -58,7 +58,7 @@ from src.embeddings import get_embedding_service
 service = get_embedding_service()
 
 # Load v0.2 graph
-ego = load_ego_from_json("fixtures/ego_graphs/fronx.json", embedding_service=service)
+ego = load_ego_from_json("data/ego_graphs/fronx.json", embedding_service=service)
 ```
 
 ### JSON Format

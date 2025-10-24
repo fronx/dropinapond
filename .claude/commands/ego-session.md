@@ -72,10 +72,10 @@ Update incrementally as the conversation flows. After each meaningful exchange w
 This keeps things manageable - you're not trying to remember everything at the end, and the user can see progress as you go.
 
 ### 1. Determine Graph Name
-Ask the user what to call their graph, or use their first name. This becomes the filename: `fixtures/ego_graphs/{name}.json`
+Ask the user what to call their graph, or use their first name. This becomes the filename: `data/ego_graphs/{name}.json`
 
 ### 2. Load or Create Graph
-- Check if `fixtures/ego_graphs/{name}.json` exists
+- Check if `data/ego_graphs/{name}.json` exists
 - If yes: Read and parse it
 - If no: Create new graph with v0.2 schema:
 
