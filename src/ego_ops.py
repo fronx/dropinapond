@@ -333,6 +333,158 @@ def public_legibility_r2_per_neighbor(ego: EgoData, lam: float = 1e-3) -> Dict[s
         out[j] = _r2_vector(zF, z_hat)
     return out
 
+def compute_phrase_similarities(
+    embedding_service,
+    graph_name: str,
+    focal_id: str,
+    neighbor_id: str,
+    top_k: int = 10
+) -> List[Dict]:
+    """
+    Compute semantic similarity between focal node's phrases and neighbor's phrases.
+    Returns top-k most similar phrase pairs based on cosine similarity of embeddings.
+
+    NOTE: This is for contextual understanding, NOT what's used in readability R².
+    Readability uses mean embeddings, not individual phrase pairs.
+
+    Args:
+        embedding_service: EmbeddingService instance
+        graph_name: Name of the ego graph
+        focal_id: ID of the focal node
+        neighbor_id: ID of the neighbor node
+        top_k: Number of top pairs to return
+
+    Returns:
+        List of dicts with keys: focal_phrase, neighbor_phrase, similarity, focal_weight, neighbor_weight
+    """
+    # Get all phrase data for focal node
+    focal_data = embedding_service.get_all_node_phrases(graph_name, focal_id)
+
+    # Get all phrase data for neighbor
+    neighbor_data = embedding_service.get_all_node_phrases(graph_name, neighbor_id)
+
+    if not focal_data or not neighbor_data:
+        return []
+
+    similarities = []
+
+    # Compute all pairwise similarities
+    for focal_phrase_id, focal_phrase_data in focal_data.items():
+        focal_emb = focal_phrase_data['embedding']
+        focal_text = focal_phrase_data['text']
+        focal_weight = focal_phrase_data['metadata'].get('weight', 1.0)
+
+        for neighbor_phrase_id, neighbor_phrase_data in neighbor_data.items():
+            neighbor_emb = neighbor_phrase_data['embedding']
+            neighbor_text = neighbor_phrase_data['text']
+            neighbor_weight = neighbor_phrase_data['metadata'].get('weight', 1.0)
+
+            sim = _cos(focal_emb, neighbor_emb)
+            if sim > 0.3:  # Only include reasonably similar pairs
+                similarities.append({
+                    'focal_phrase': focal_text,
+                    'neighbor_phrase': neighbor_text,
+                    'similarity': float(sim),
+                    'focal_weight': focal_weight,
+                    'neighbor_weight': neighbor_weight
+                })
+
+    # Sort by similarity * combined weights
+    similarities.sort(key=lambda x: x['similarity'] * x['focal_weight'] * x['neighbor_weight'], reverse=True)
+
+    return similarities[:top_k]
+
+def compute_readability_explanation(
+    ego: EgoData,
+    embedding_service,
+    graph_name: str,
+    neighbor_id: str,
+    lam: float = 1e-3
+) -> Dict:
+    """
+    Compute detailed explanation of readability (R²) for a specific neighbor.
+    Shows what ACTUALLY goes into the ridge regression computation.
+
+    Returns:
+        Dict with:
+        - r2: The R² score
+        - alpha: The ridge coefficient
+        - focal_mean_contributors: Phrases contributing most to focal's mean embedding
+        - neighbor_mean_contributors: Phrases contributing most to neighbor's mean embedding
+        - reconstruction_quality: How well neighbor reconstructs each focal phrase
+    """
+    F = ego.focal
+    zF = ego.embeddings[F]
+    zj = ego.embeddings[neighbor_id]
+
+    # Compute readability
+    denom = np.dot(zj, zj) + lam
+    alpha_j = float(np.dot(zj, zF) / denom)
+    z_hat = alpha_j * zj
+    r2 = _r2_vector(zF, z_hat)
+
+    # Get phrase data
+    focal_data = embedding_service.get_all_node_phrases(graph_name, F)
+    neighbor_data = embedding_service.get_all_node_phrases(graph_name, neighbor_id)
+
+    # Compute contribution of each focal phrase to the mean
+    focal_phrases_data = []
+    focal_weights_sum = sum(p['metadata'].get('weight', 1.0) for p in focal_data.values())
+
+    for phrase_id, phrase_data in focal_data.items():
+        weight = phrase_data['metadata'].get('weight', 1.0)
+        normalized_weight = weight / focal_weights_sum
+        # Contribution = how much this phrase's embedding contributes to mean (weighted)
+        contribution = normalized_weight
+        focal_phrases_data.append({
+            'phrase': phrase_data['text'],
+            'weight': weight,
+            'contribution_to_mean': contribution
+        })
+
+    # Sort by contribution
+    focal_phrases_data.sort(key=lambda x: x['contribution_to_mean'], reverse=True)
+
+    # Same for neighbor
+    neighbor_phrases_data = []
+    neighbor_weights_sum = sum(p['metadata'].get('weight', 1.0) for p in neighbor_data.values())
+
+    for phrase_id, phrase_data in neighbor_data.items():
+        weight = phrase_data['metadata'].get('weight', 1.0)
+        normalized_weight = weight / neighbor_weights_sum
+        neighbor_phrases_data.append({
+            'phrase': phrase_data['text'],
+            'weight': weight,
+            'contribution_to_mean': normalized_weight
+        })
+
+    neighbor_phrases_data.sort(key=lambda x: x['contribution_to_mean'], reverse=True)
+
+    # Compute how well the reconstruction works for each focal phrase
+    reconstruction_errors = []
+    for phrase_id, phrase_data in focal_data.items():
+        phrase_emb = phrase_data['embedding']
+        # Project the reconstruction onto this phrase
+        reconstruction_fit = _cos(z_hat, phrase_emb)
+        actual_fit = _cos(zF, phrase_emb)
+        reconstruction_errors.append({
+            'phrase': phrase_data['text'],
+            'actual_alignment': float(actual_fit),
+            'reconstructed_alignment': float(reconstruction_fit),
+            'error': float(abs(actual_fit - reconstruction_fit))
+        })
+
+    # Sort by error (worst reconstructed first)
+    reconstruction_errors.sort(key=lambda x: x['error'], reverse=True)
+
+    return {
+        'r2': float(r2),
+        'alpha': alpha_j,
+        'focal_mean_contributors': focal_phrases_data[:10],
+        'neighbor_mean_contributors': neighbor_phrases_data[:10],
+        'reconstruction_quality': reconstruction_errors[:10]
+    }
+
 # ---------------------------
 # 3) Subjective attunement (you -> neighbors)
 # ---------------------------
@@ -566,6 +718,7 @@ def save_analysis_json(
     s_t: Dict[int, float],
     r2_in_per_neighbor: Dict[str, float],
     scores: Dict[str, float],
+    phrase_similarities: Optional[Dict[str, List[Dict]]] = None,
     output_dir: Optional[Path] = None,
     ego_data: Optional['EgoData'] = None
 ) -> Path:
@@ -583,6 +736,7 @@ def save_analysis_json(
         s_t: Per-cluster heat-residual novelty
         r2_in_per_neighbor: Per-neighbor readability R^2
         scores: Orientation scores per neighbor
+        phrase_similarities: Per-neighbor phrase-level semantic overlaps
         output_dir: Directory to save analysis (defaults to data/analyses/)
 
     Returns:
@@ -633,7 +787,8 @@ def save_analysis_json(
             "subjective_attunement_per_cluster": cluster_dict_to_serializable(r2_out),
             "heat_residual_novelty": cluster_dict_to_serializable(s_t),
             "per_neighbor_readability": r2_in_per_neighbor,
-            "orientation_scores": scores
+            "orientation_scores": scores,
+            "phrase_similarities": phrase_similarities or {}
         },
         "recommendations": recommendations
     }
@@ -745,6 +900,21 @@ if __name__ == "__main__":
     best = max(scores, key=scores.__getitem__)
     print(f"\nBest next approach: {format_node(best)}")
 
+    # 7) Compute phrase-level semantic similarities for each neighbor
+    print("\nComputing phrase similarities...")
+    phrase_similarities = {}
+    for j in neighbors:
+        similarities = compute_phrase_similarities(
+            embedding_service=embedding_service,
+            graph_name=name,
+            focal_id=F,
+            neighbor_id=j,
+            top_k=10
+        )
+        phrase_similarities[j] = similarities
+        if similarities:
+            print(f"  {format_node(j)}: {len(similarities)} semantic overlaps (top: {similarities[0]['similarity']:.2f})")
+
     # Save analysis to JSON
     analysis_path = save_analysis_json(
         ego_graph_path=fixture_path,
@@ -757,6 +927,7 @@ if __name__ == "__main__":
         s_t=s_t,
         r2_in_per_neighbor=r2_in_per_neighbor,
         scores=scores,
+        phrase_similarities=phrase_similarities,
         ego_data=ego
     )
     print(f"\nAnalysis saved to: {analysis_path}")

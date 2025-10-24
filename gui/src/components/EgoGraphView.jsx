@@ -9,6 +9,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { PersonNode } from './PersonNode';
 import { AnalysisPanel } from './AnalysisPanel';
+import { PersonDetailSidebar } from './PersonDetailSidebar';
 import { loadEgoGraph, loadLatestAnalysis, parseEgoGraphForFlow } from '../lib/egoGraphLoader';
 import { createForceSimulation } from '../lib/d3Layout';
 import { updateEdgeHandles } from '../lib/edgeUtils';
@@ -25,6 +26,8 @@ export function EgoGraphView() {
   const [error, setError] = useState(null);
   const [metadata, setMetadata] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
+  const [egoGraphData, setEgoGraphData] = useState(null);
+  const [selectedPerson, setSelectedPerson] = useState(null);
   const simulationRef = useRef(null);
 
   useEffect(() => {
@@ -36,6 +39,7 @@ export function EgoGraphView() {
         // Load ego graph data
         const egoData = await loadEgoGraph(graphName || 'fronx');
         setMetadata(egoData.metadata);
+        setEgoGraphData(egoData);
 
         // Load analysis data (if available)
         const analysisData = await loadLatestAnalysis(graphName || 'fronx');
@@ -56,8 +60,15 @@ export function EgoGraphView() {
         console.log('Loaded nodes:', parsedNodes);
         console.log('Loaded edges:', parsedEdges);
 
-        // Store analysis data for the panel
-        setAnalysisData({ clusterMetrics, overallMetrics, recommendations, nodeNameMap });
+        // Store analysis data for the panel and sidebar
+        // Keep both the raw analysis data and the parsed metrics
+        setAnalysisData({
+          metrics: analysisData?.metrics, // Raw metrics from analysis file
+          clusterMetrics,
+          overallMetrics,
+          recommendations,
+          nodeNameMap
+        });
 
         setEdges(parsedEdges);
 
@@ -90,6 +101,12 @@ export function EgoGraphView() {
     };
   }, [graphName, setNodes, setEdges]);
 
+  // Handle node click to open sidebar
+  const handleNodeClick = useCallback((event, node) => {
+    const personData = node.data.person;
+    setSelectedPerson(personData);
+  }, []);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -115,6 +132,7 @@ export function EgoGraphView() {
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onNodeClick={handleNodeClick}
           nodeTypes={nodeTypes}
           fitView
           fitViewOptions={{ padding: 0.2, minZoom: 0.1, maxZoom: 2 }}
@@ -125,6 +143,16 @@ export function EgoGraphView() {
           {/* <Controls /> */}
         </ReactFlow>
       </div>
+
+      {/* Person Detail Sidebar (left side) */}
+      {selectedPerson && egoGraphData && (
+        <PersonDetailSidebar
+          person={selectedPerson}
+          egoGraphData={egoGraphData}
+          analysisData={analysisData}
+          onClose={() => setSelectedPerson(null)}
+        />
+      )}
 
       {/* Analysis Panel (right side) */}
       {analysisData && (
