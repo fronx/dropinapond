@@ -4,8 +4,8 @@ export function PersonNode({ data, selected }) {
   const { person, isSelf, connectionStrength = 0.5 } = data;
   const latestAvailability = person.availability?.[0];
 
-  // Scale node size based on connection strength (0.6x to 1.0x)
-  const scale = isSelf ? 1.0 : 0.5 + (connectionStrength * 0.5);
+  // Scale node size based on connection strength (smaller overall)
+  const scale = isSelf ? 0.7 : 0.35 + (connectionStrength * 0.35);
   const fontSize = 0.875 * scale;
   const padding = `${8 * scale}px ${16 * scale}px`;
 

@@ -8,8 +8,8 @@ export function createForceSimulation(nodes, edges, onTick, options = {}) {
   const {
     width = 500,
     height = 500,
-    strength = -200,
-    distance = 100,
+    strength = -300,
+    distance = 150,
   } = options;
 
   // Convert edges to D3 format with link strength based on actual connection strength
@@ -32,9 +32,9 @@ export function createForceSimulation(nodes, edges, onTick, options = {}) {
     )
     .force('center', d3.forceCenter(width / 2, height / 2))
     .force('collision', d3.forceCollide()
-      .radius(80) // Larger collision radius to give nodes more space
-      .strength(0.9) // Strong collision avoidance
-      .iterations(3) // Multiple iterations for better collision resolution
+      .radius(60) // Larger radius to spread nodes out
+      .strength(0.7) // Moderate collision strength
+      .iterations(2)
     )
     .on('tick', () => {
       // Update node positions on each tick
