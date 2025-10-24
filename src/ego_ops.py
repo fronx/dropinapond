@@ -566,7 +566,8 @@ def save_analysis_json(
     s_t: Dict[int, float],
     r2_in_per_neighbor: Dict[str, float],
     scores: Dict[str, float],
-    output_dir: Optional[Path] = None
+    output_dir: Optional[Path] = None,
+    ego_data: Optional['EgoData'] = None
 ) -> Path:
     """
     Save analysis results to JSON file.
@@ -599,10 +600,16 @@ def save_analysis_json(
     # Convert clusters from sets to sorted lists for JSON serialization
     clusters_serializable = [sorted(list(c)) for c in clusters]
 
+    # Helper to get node name (fallback to ID if no name)
+    def get_node_name(node_id):
+        if ego_data and ego_data.names and node_id in ego_data.names:
+            return ego_data.names[node_id]
+        return node_id
+
     # Convert cluster-keyed dicts to use tuple-of-names as keys (more readable)
     def cluster_dict_to_serializable(cluster_dict):
         return {
-            ", ".join(sorted(list(clusters[k]))): v
+            ", ".join([get_node_name(node_id) for node_id in sorted(list(clusters[k]))]): v
             for k, v in cluster_dict.items()
         }
 
@@ -706,7 +713,7 @@ if __name__ == "__main__":
         for k in range(len(clusters))
     }
     home_idx = max(tie_weight_by_pocket, key=lambda k: tie_weight_by_pocket[k])
-    q_base = ego.embeddings["F"]  # start with your own content vector as "message"
+    q_base = ego.embeddings[F]  # start with your own content vector as "message"
     alpha = 0.2  # gentle translation toward a pocket
 
     # 6) Orientation scores (mild exploration)
@@ -717,7 +724,7 @@ if __name__ == "__main__":
         q_base=q_base,
         home_pocket_idx=home_idx,
         alpha=alpha,
-        instabilities={"B": 0.05},  # if you have any flakiness prior, inject here
+        instabilities={},  # if you have any flakiness prior, inject here
         weights=OrientationWeights(lam1=1.0, lam2=0.8, lam3=0.7, lam4=1.2, lam5=0.5),
         ridge_lam=1e-3
     )
@@ -749,7 +756,8 @@ if __name__ == "__main__":
         r2_out=r2_out,
         s_t=s_t,
         r2_in_per_neighbor=r2_in_per_neighbor,
-        scores=scores
+        scores=scores,
+        ego_data=ego
     )
     print(f"\nAnalysis saved to: {analysis_path}")
 
