@@ -35,16 +35,25 @@ It's **distributed and privacy-preserving**: each person runs local computations
 - Active inference framework
 - Future federation protocol
 
-### 4. [Implementation Guide](IMPLEMENTATION.md)
+### 4. [Conversational Interface](CONVERSATIONAL_INTERFACE.md)
+**Build your ego graph through natural dialogue**
+
+- Quick start with `/ego-session` command
+- What Claude extracts from conversation
+- Privacy and file structure
+- Getting navigation insights
+- Tips for effective sessions
+
+### 5. [Implementation Guide](IMPLEMENTATION.md)
 **How to build, run, and extend the system**
 
 - Current implementation status
 - Running the example
 - Adding new metrics
 - Integrating embedding models
-- Building the conversational interface
+- Technical details
 
-### 5. [Refinements Document](REFINEMENTS.md)
+### 6. [Refinements Document](REFINEMENTS.md)
 **Key conceptual clarifications (post-initial review)**
 
 - Epistemic ego graphs vs. objective graphs
@@ -53,7 +62,7 @@ It's **distributed and privacy-preserving**: each person runs local computations
 - Prediction-error exchange protocol
 - Terminology shifts and alignment improvements
 
-### 6. [Continuous Semantic Fields](CONTINUOUS_FIELDS.md)
+### 7. [Continuous Semantic Fields](CONTINUOUS_FIELDS.md)
 **Architectural shift from discrete clustering to continuous fields**
 
 - Why continuous fields vs. discrete clusters
@@ -62,7 +71,7 @@ It's **distributed and privacy-preserving**: each person runs local computations
 - On-demand clustering (compute transiently, never store)
 - Implementation roadmap and migration path
 
-### 7. [Temporal Dynamics](TEMPORAL_DYNAMICS.md)
+### 8. [Temporal Dynamics](TEMPORAL_DYNAMICS.md)
 **Living semantic fields: memory without historical baggage**
 
 - The living graph model (no event log, just continuous decay)

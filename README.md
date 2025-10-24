@@ -6,6 +6,22 @@ A **semantic network navigation system** for understanding and strategically nav
 
 ## Quick Start
 
+### Option 1: Conversational Interface (Recommended)
+
+Build your ego graph through natural conversation with Claude:
+
+```bash
+# Install dependencies
+uv sync
+
+# In a Claude Code session, run:
+/ego-session
+```
+
+Claude will guide you through building your network graph conversationally. See [Conversational Interface](docs/CONVERSATIONAL_INTERFACE.md) for details.
+
+### Option 2: Analyze Existing Graph
+
 ```bash
 # Install dependencies
 uv sync
@@ -19,6 +35,7 @@ This analyzes the [example ego graph](fixtures/ego_graphs/fronx.json) and output
 ## Documentation
 
 - **[Documentation Index](docs/INDEX.md)** - Start here for full overview
+- **[Conversational Interface](docs/CONVERSATIONAL_INTERFACE.md)** - Build your graph through natural dialogue
 - **[Vision & User Experience](docs/VISION.md)** - What is this and what's it like to use?
 - **[Architecture](docs/ARCHITECTURE.md)** - How does it work internally?
 - **[Distributed Protocol](docs/DISTRIBUTED.md)** - Privacy model & federation

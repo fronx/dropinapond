@@ -22,6 +22,22 @@ uv run python src/ego_ops.py <graph_name>
 # (looks for fixtures/ego_graphs/<graph_name>.json)
 ```
 
+### Ego Graph Building Sessions
+
+To help a user build or update their ego graph through conversation, use:
+
+```
+/ego-session
+```
+
+This loads a conversational guide that helps you:
+- Extract semantic information naturally from dialogue
+- Structure updates to ego graph JSON files
+- Compute embeddings for new phrases
+- Provide navigation insights at appropriate moments
+
+See [.claude/commands/ego-session.md](.claude/commands/ego-session.md) for full details.
+
 ### Testing
 
 No test suite exists yet. When creating tests, use pytest:
