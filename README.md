@@ -6,7 +6,19 @@ A **semantic network navigation system** for understanding and strategically nav
 
 ## Quick Start
 
-### Option 1: Conversational Interface (Recommended)
+### Option 1: Visual Interface
+
+Explore ego graphs with an interactive force-directed visualization:
+
+```bash
+cd gui
+npm install
+npm run dev
+```
+
+Then open `http://localhost:5173/fronx` to view the example graph. See [gui/README.md](gui/README.md) for details.
+
+### Option 2: Conversational Interface
 
 Build your ego graph through natural conversation with Claude:
 
@@ -20,7 +32,7 @@ uv sync
 
 Claude will guide you through building your network graph conversationally. See [Conversational Interface](docs/CONVERSATIONAL_INTERFACE.md) for details.
 
-### Option 2: Analyze Existing Graph
+### Option 3: Analyze Existing Graph
 
 ```bash
 # Install dependencies
