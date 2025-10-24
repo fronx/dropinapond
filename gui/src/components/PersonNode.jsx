@@ -1,12 +1,17 @@
 import { Handle, Position } from '@xyflow/react';
 
 export function PersonNode({ data, selected }) {
-  const { person, isSelf } = data;
+  const { person, isSelf, connectionStrength = 0.5 } = data;
   const latestAvailability = person.availability?.[0];
+
+  // Scale node size based on connection strength (0.6x to 1.0x)
+  const scale = isSelf ? 1.0 : 0.5 + (connectionStrength * 0.5);
+  const fontSize = 0.875 * scale;
+  const padding = `${8 * scale}px ${16 * scale}px`;
 
   const nodeStyle = {
     position: 'relative',
-    padding: '8px 16px',
+    padding,
     borderRadius: '6px',
     boxShadow: selected
       ? '0 0 0 3px #c084fc, 0 4px 6px -1px rgba(0, 0, 0, 0.2)'
@@ -15,7 +20,7 @@ export function PersonNode({ data, selected }) {
     border: isSelf ? '2px solid #3b82f6' : '2px solid #d1d5db',
     backgroundColor: isSelf ? '#eff6ff' : 'white',
     cursor: 'pointer',
-    fontSize: '0.875rem',
+    fontSize: `${fontSize}rem`,
     fontWeight: '600',
     color: isSelf ? '#1e40af' : '#1f2937',
   };

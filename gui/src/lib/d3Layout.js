@@ -6,29 +6,36 @@ import * as d3 from 'd3';
  */
 export function createForceSimulation(nodes, edges, onTick, options = {}) {
   const {
-    width = 1000,
+    width = 500,
     height = 500,
-    strength = -50,
-    distance = 200,
+    strength = -200,
+    distance = 100,
   } = options;
 
   // Convert edges to D3 format with link strength based on actual connection strength
   const d3Links = edges.map(edge => ({
     source: edge.source,
     target: edge.target,
-    strength: edge.data?.actualStrength || 0.5,
+    strength: edge.data?.actualStrength || 0.3,
   }));
 
   // Create D3 simulation
   const simulation = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(d3Links)
       .id(d => d.id)
-      .distance(d => distance / (d.strength + 0.1)) // Stronger connections = closer nodes
-      .strength(d => d.strength * 1.0) // Use edge strength for link force
+      .distance(d => distance * Math.exp(-d.strength * 2)) // Exponential: stronger connections = exponentially closer nodes
+      .strength(d => 0.3 * Math.exp(d.strength * 1.5)) // Exponential strength: stronger edges pull harder
     )
-    .force('charge', d3.forceManyBody().strength(strength))
+    .force('charge', d3.forceManyBody()
+      .strength(strength)
+      .distanceMax(400) // Limit repulsion range to create clustering while avoiding overlaps
+    )
     .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collision', d3.forceCollide().radius(60))
+    .force('collision', d3.forceCollide()
+      .radius(80) // Larger collision radius to give nodes more space
+      .strength(0.9) // Strong collision avoidance
+      .iterations(3) // Multiple iterations for better collision resolution
+    )
     .on('tick', () => {
       // Update node positions on each tick
       const updatedNodes = nodes.map(node => ({
@@ -67,8 +74,8 @@ export function applyForceLayout(nodes, edges, options = {}) {
   const simulation = d3.forceSimulation(nodes)
     .force('link', d3.forceLink(d3Links)
       .id(d => d.id)
-      .distance(d => distance / (d.strength + 0.1)) // Stronger connections = closer nodes
-      .strength(d => d.strength * 0.7) // Use edge strength for link force
+      .distance(d => distance * Math.exp(-d.strength * 2)) // Exponential: stronger connections = exponentially closer nodes
+      .strength(d => Math.exp(d.strength * 2) - 1) // Exponential strength: stronger edges pull harder
     )
     .force('charge', d3.forceManyBody().strength(strength))
     .force('center', d3.forceCenter(width / 2, height / 2))

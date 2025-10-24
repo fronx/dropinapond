@@ -100,13 +100,13 @@ export function EgoGraphView() {
         padding: '1rem 1.5rem'
       }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937' }}>
-          Ego Graph: {graphName || 'fronx'}
+          graphName
         </h1>
-        {metadata?.description && (
+        {/* {metadata?.description && (
           <p style={{ fontSize: '0.875rem', color: '#4b5563', marginTop: '0.25rem' }}>
             {metadata.description}
           </p>
-        )}
+        )} */}
         <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
           {nodes.length} nodes, {edges.length} edges
         </div>

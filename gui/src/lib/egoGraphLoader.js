@@ -23,6 +23,14 @@ export function parseEgoGraphForFlow(egoData) {
   const nodes = [];
   const edges = [];
 
+  // Build a map of connection strengths from focal node to each person
+  const strengthMap = new Map();
+  egoData.edges.forEach((edge) => {
+    if (edge.source === egoData.self.id) {
+      strengthMap.set(edge.target, edge.actual || 0.3);
+    }
+  });
+
   // Add self node (focal node)
   nodes.push({
     id: egoData.self.id,
@@ -30,6 +38,7 @@ export function parseEgoGraphForFlow(egoData) {
     data: {
       person: egoData.self,
       isSelf: true,
+      connectionStrength: 1.0, // Focal node is always max strength
     },
     position: { x: 0, y: 0 }, // Will be overridden by D3 layout
   });
@@ -42,6 +51,7 @@ export function parseEgoGraphForFlow(egoData) {
       data: {
         person: connection,
         isSelf: false,
+        connectionStrength: strengthMap.get(connection.id) || 0.3,
       },
       position: { x: 0, y: 0 }, // Will be overridden by D3 layout
     });
