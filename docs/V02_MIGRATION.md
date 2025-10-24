@@ -66,19 +66,22 @@ ego = load_ego_from_json("data/ego_graphs/fronx.json", embedding_service=service
 ```json
 {
   "version": "0.2",
-  "focal_node": "F",
-  "nodes": [
+  "self": {
+    "id": "F",
+    "name": "Your Name",
+    "phrases": [
+      {
+        "text": "semantic navigation",
+        "weight": 0.9,
+        "last_updated": "2025-10-24"
+      }
+    ]
+  },
+  "connections": [
     {
-      "id": "F",
-      "name": "Your Name",
-      "is_self": true,
-      "phrases": [
-        {
-          "text": "semantic navigation",
-          "weight": 0.9,
-          "last_updated": "2025-10-24"
-        }
-      ]
+      "id": "neighbor1",
+      "name": "Neighbor Name",
+      "phrases": [...]
     }
   ],
   "edges": [
@@ -116,8 +119,10 @@ To convert v0.1 → v0.2:
 2. Add `text`, `weight`, `last_updated` to each phrase
 3. Remove `embedding` field from nodes
 4. Update edge format: `u/v` → `source/target`
-5. Add `version: "0.2"` and `focal_node` fields
-6. Embeddings will be computed automatically on first load
+5. Restructure: separate focal node into `self` field, all others into `connections` array
+6. Remove `is_self` field (no longer needed)
+7. Add `version: "0.2"` field
+8. Embeddings will be computed automatically on first load
 
 ## ChromaDB Storage
 

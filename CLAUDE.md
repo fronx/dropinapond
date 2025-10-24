@@ -94,19 +94,22 @@ Ego graphs are JSON files with this structure (embeddings stored separately in C
 ```json
 {
   "version": "0.2",
-  "focal_node": "F",
-  "nodes": [
+  "self": {
+    "id": "F",
+    "name": "Your Name",
+    "phrases": [
+      {
+        "text": "topic phrase",
+        "weight": 1.0,
+        "last_updated": "2025-10-24"
+      }
+    ]
+  },
+  "connections": [
     {
-      "id": "F",
-      "name": "Your Name",
-      "is_self": true,
-      "phrases": [
-        {
-          "text": "topic phrase",
-          "weight": 1.0,
-          "last_updated": "2025-10-24"
-        }
-      ]
+      "id": "neighbor1",
+      "name": "Neighbor Name",
+      "phrases": [...]
     }
   ],
   "edges": [

@@ -4,24 +4,23 @@
   "title": "Ego Graph v0.2",
   "description": "Schema for v0.2 ego graphs with phrase-level semantic fields. Embeddings are stored separately in ChromaDB, not in this JSON.",
   "type": "object",
-  "required": ["version", "focal_node", "nodes", "edges"],
+  "required": ["version", "self", "connections", "edges"],
   "properties": {
     "version": {
       "type": "string",
       "const": "0.2",
       "description": "Schema version (must be '0.2')"
     },
-    "focal_node": {
-      "type": "string",
-      "description": "ID of the focal node (the person whose ego graph this is)"
+    "self": {
+      "description": "The focal node (the person whose ego graph this is)",
+      "$ref": "#/definitions/node"
     },
-    "nodes": {
+    "connections": {
       "type": "array",
-      "description": "List of nodes in the ego graph",
+      "description": "List of connected nodes (neighbors)",
       "items": {
         "$ref": "#/definitions/node"
-      },
-      "minItems": 1
+      }
     },
     "edges": {
       "type": "array",
@@ -61,11 +60,6 @@
           "items": {
             "$ref": "#/definitions/phrase"
           }
-        },
-        "is_self": {
-          "type": "boolean",
-          "description": "True if this node is the focal node (self)",
-          "default": false
         },
         "metadata": {
           "type": "object",

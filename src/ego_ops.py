@@ -86,14 +86,18 @@ def load_ego_from_json(
     Expected format:
     {
       "version": "0.2",
-      "focal_node": "F",
-      "nodes": [
+      "self": {
+        "id": "F",
+        "name": "...",
+        "phrases": [
+          {"text": "...", "weight": 1.0, "last_updated": "2025-10-24"}
+        ]
+      },
+      "connections": [
         {
-          "id": "F",
+          "id": "neighbor1",
           "name": "...",
-          "phrases": [
-            {"text": "...", "weight": 1.0, "last_updated": "2025-10-24"}
-          ]
+          "phrases": [...]
         }
       ],
       "edges": [{"source": "F", "target": "neighbor1", "actual": 0.8}]
@@ -121,8 +125,10 @@ def load_ego_from_json(
             "Import from src.embeddings and pass get_embedding_service()"
         )
 
-    focal_id = data["focal_node"]
-    nodes_data = data["nodes"]
+    self_node = data["self"]
+    focal_id = self_node["id"]
+    connections_data = data.get("connections", [])
+    nodes_data = [self_node] + connections_data
     edges_data = data.get("edges", [])
 
     # Extract graph name from filepath
