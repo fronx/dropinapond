@@ -7,4 +7,5 @@ dependencies = [
     "networkx>=3.0",
     "scipy>=1.10",
     "scikit-learn>=1.2",
+    "matplotlib>=3.9.4",
 ]
