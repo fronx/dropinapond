@@ -134,6 +134,8 @@ Ego graphs are JSON files with this structure:
 - Active inference loop (predict → interact → update)
 - Inter-node privacy-preserving protocol
 
+Every time we commit an increment, we must also update `IMPLEMENTATION.md` accordingly.
+
 ## Key Design Principles
 
 **Privacy-first**: No centralized graph. Each person's ego graph contains their ground truth plus predictions of neighbors. No raw embedding exchange between nodes.
