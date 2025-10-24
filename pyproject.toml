@@ -8,4 +8,6 @@ dependencies = [
     "scipy>=1.10",
     "scikit-learn>=1.2",
     "matplotlib>=3.9.4",
+    "chromadb>=1.2.1",
+    "sentence-transformers>=5.1.2",
 ]

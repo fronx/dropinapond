@@ -71,36 +71,33 @@ All metrics operate on continuous semantic fields using kernel methods:
 
 **fixtures/ego_graphs/*.json**: Example ego graph data files
 
-### Data Format (v0.2 - Continuous Fields)
+### Data Format (v0.2 - Phrase-Level with ChromaDB)
 
-Ego graphs are JSON files with this structure:
+Ego graphs are JSON files with this structure (embeddings stored separately in ChromaDB):
 
 ```json
 {
+  "version": "0.2",
   "focal_node": "F",
   "nodes": [
     {
       "id": "F",
       "name": "Your Name",
+      "is_self": true,
       "phrases": [
         {
           "text": "topic phrase",
-          "embedding": [0.82, 0.31, -0.15, ...],
           "weight": 1.0,
-          "last_updated": "2025-10-15"
+          "last_updated": "2025-10-24"
         }
-      ],
-      "embedding": {
-        "mean": [0.80, 0.28, -0.12, ...]  // Optional summary
-      },
-      "is_self": true
+      ]
     }
   ],
   "edges": [
     {
       "source": "F",
       "target": "neighbor1",
-      "actual": {"present": 0.8, "past": 0.5, "future": 0.3},
+      "actual": 0.8,
       "potential": 0.65
     }
   ]
@@ -108,33 +105,38 @@ Ego graphs are JSON files with this structure:
 ```
 
 **Key points**:
-- `phrases` array is the PRIMARY representation (not `embedding.mean`)
-- Phrase weights decay exponentially over time
-- `potential` edge = projected mutual predictability (not just cosine similarity)
-- `actual` edge has temporal dimensions (past/present/future) that also decay
+- `phrases` array contains text only (NOT embeddings - those are in ChromaDB)
+- Phrase embeddings computed via sentence-transformers (`all-MiniLM-L6-v2`, 384 dims)
+- Embeddings cached in `./chroma_db/` directory (gitignored)
+- Each graph gets its own ChromaDB collection
+- Mean embedding computed on-demand from weighted phrase embeddings
+- Phrase `weight` is optional (defaults to 1.0)
+- Temporal decay not yet implemented (planned v0.3)
 
 ## Current Implementation Status
 
-**Works now (v0.1)**:
-- All six navigation metrics with discrete clustering
-- Example fixture with 8 people, 2 clusters
+**✅ Works now (v0.2)**:
+- All six navigation metrics with discrete clustering (working with real embeddings)
+- Phrase-level semantic fields (ChromaDB integration)
+- Sentence-transformer embeddings (`all-MiniLM-L6-v2`, 384 dims)
+- JSON schema validation
+- Example fixture with 8 people, realistic semantic clusters
 - Command-line analysis tool
 - Keyphrase translation hints
+- Backward compatibility with v0.1 format
 
-**In progress (v0.2)**: Refactoring to continuous semantic fields
-- Data schema: phrase-level embeddings as primary representation
+**🔜 In progress (current sprint)**:
+- Conversational interface (Claude-based ego graph builder)
+
+**📋 Planned (v0.3+)**:
 - Kernel-based neighborhoods instead of discrete clusters
 - Gradient-based translation instead of centroid differences
 - On-demand clustering (compute transiently, never store)
-
-**Planned (v0.3+)**:
-- Conversational interface (Claude-based ego graph builder)
-- Embedding computation pipeline (sentence transformers)
 - Temporal dynamics with exponential decay
 - Active inference loop (predict → interact → update)
 - Inter-node privacy-preserving protocol
 
-Every time we commit an increment, we must also update `IMPLEMENTATION.md` accordingly.
+See `docs/V02_MIGRATION.md` for details on the v0.2 architecture.
 
 ## Key Design Principles
 

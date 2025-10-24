@@ -70,63 +70,130 @@ class EgoData:
 # JSON loading
 # ---------------------------
 
-def load_ego_from_json(filepath: str | Path, focal_id: str = "F") -> EgoData:
+def load_ego_from_json(
+    filepath: str | Path,
+    embedding_service
+) -> EgoData:
     """
-    Load ego graph from JSON file.
+    Load ego graph from v0.2 JSON file.
 
     Expected format:
     {
-      "F": {"name": "...", "embedding": [...], "keyphrases": {...}},
-      "neighbor1": {"name": "...", "embedding": [...], ...},
-      ...
-      "edges": [  # optional
-        {"u": "F", "v": "neighbor1", "potential": 0.8, "actual": 0.5},
-        ...
-      ]
+      "version": "0.2",
+      "focal_node": "F",
+      "nodes": [
+        {
+          "id": "F",
+          "name": "...",
+          "phrases": [
+            {"text": "...", "weight": 1.0, "last_updated": "2025-10-24"}
+          ]
+        }
+      ],
+      "edges": [{"source": "F", "target": "neighbor1", "actual": 0.8}]
     }
 
-    If edges are not provided, derives potential edges from embedding cosine similarity.
+    Embeddings are fetched from ChromaDB via embedding_service.
+
+    Args:
+        filepath: Path to JSON file
+        embedding_service: EmbeddingService instance (required)
+
+    Returns:
+        EgoData instance
     """
     with open(filepath) as f:
         data = json.load(f)
 
-    # Extract edges if provided, otherwise empty list
-    edges_data = data.pop("edges", [])
+    if data.get("version") != "0.2":
+        raise ValueError(f"Only v0.2 format supported. Found version: {data.get('version')}")
 
-    # Nodes, embeddings, and names
-    nodes = list(data.keys())
-    embeddings = {
-        node_id: np.array(node_data["embedding"], dtype=float)
-        for node_id, node_data in data.items()
-    }
-    names = {
-        node_id: node_data.get("name", node_id)
-        for node_id, node_data in data.items()
-    }
+    filepath = Path(filepath)
+    if embedding_service is None:
+        raise ValueError(
+            "v0.2 format requires an EmbeddingService instance. "
+            "Import from src.embeddings and pass get_embedding_service()"
+        )
 
-    # Build edges with multi-dimensional structure
-    # Start by deriving potential edges from all embeddings
+    focal_id = data["focal_node"]
+    nodes_data = data["nodes"]
+    edges_data = data.get("edges", [])
+
+    # Extract graph name from filepath
+    graph_name = Path(filepath).stem
+
+    # Process nodes and compute mean embeddings from phrases
+    nodes = []
+    embeddings = {}
+    names = {}
+
+    for node in nodes_data:
+        node_id = node["id"]
+        nodes.append(node_id)
+        names[node_id] = node.get("name", node_id)
+
+        phrases = node.get("phrases", [])
+        if not phrases:
+            # No phrases - use zero vector (edge case)
+            embeddings[node_id] = np.zeros(384)  # all-MiniLM-L6-v2 dimension
+            continue
+
+        # Extract phrase texts and weights
+        phrase_texts = [p["text"] for p in phrases]
+        weights = {
+            f"{node_id}:phrase_{i}": p.get("weight", 1.0)
+            for i, p in enumerate(phrases)
+        }
+
+        # Add phrases to ChromaDB if not already present
+        phrase_ids = [f"{node_id}:phrase_{i}" for i in range(len(phrase_texts))]
+
+        # Check if phrases already exist
+        try:
+            existing_embeddings = embedding_service.get_embeddings(graph_name, phrase_ids)
+            if len(existing_embeddings) != len(phrase_ids):
+                # Some missing, add them
+                embedding_service.add_phrases(
+                    graph_name=graph_name,
+                    node_id=node_id,
+                    phrases=phrase_texts,
+                    phrase_ids=phrase_ids
+                )
+        except:
+            # Add all phrases
+            embedding_service.add_phrases(
+                graph_name=graph_name,
+                node_id=node_id,
+                phrases=phrase_texts,
+                phrase_ids=phrase_ids
+            )
+
+        # Compute weighted mean embedding
+        mean_embedding = embedding_service.compute_mean_embedding(
+            graph_name=graph_name,
+            node_id=node_id,
+            weights=weights
+        )
+        embeddings[node_id] = mean_embedding
+
+    # Build edges from explicit edge list only
+    # Compute potential for all edges, but only include edges in the provided list
     edge_dict = {}  # (u, v) -> dims dict
 
-    for i, u in enumerate(nodes):
-        for v in nodes[i+1:]:
-            cos_sim = max(0.0, _cos(embeddings[u], embeddings[v]))
-            if cos_sim > 0.1:  # threshold for edge creation
-                key = tuple(sorted([u, v]))
-                edge_dict[key] = {"potential": cos_sim}
-
-    # Merge in provided edges (adds actual, temporal, etc. dimensions)
     if edges_data:
         for e in edges_data:
-            u, v = e["u"], e["v"]
+            u, v = e["source"], e["target"]
             key = tuple(sorted([u, v]))
-            extra_dims = {k: val for k, val in e.items() if k not in ["u", "v"]}
 
-            if key in edge_dict:
-                edge_dict[key].update(extra_dims)
-            else:
-                # Edge provided without potential (no embedding similarity)
-                edge_dict[key] = extra_dims
+            # Compute potential from embeddings
+            cos_sim = max(0.0, _cos(embeddings[u], embeddings[v]))
+            dims = {"potential": cos_sim}
+
+            # Add any other dimensions (actual, etc.)
+            extra_dims = {k: val for k, val in e.items() if k not in ["source", "target"]}
+            dims.update(extra_dims)
+
+            edge_dict[key] = dims
 
     # Convert to list format
     edges = [(u, v, dims) for (u, v), dims in edge_dict.items()]
@@ -480,7 +547,12 @@ if __name__ == "__main__":
 
     name = sys.argv[1]
     fixture_path = Path(__file__).parent.parent / "fixtures" / "ego_graphs" / f"{name}.json"
-    ego = load_ego_from_json(fixture_path)
+
+    # Import and initialize embedding service
+    from embeddings import get_embedding_service
+    embedding_service = get_embedding_service()
+    ego = load_ego_from_json(fixture_path, embedding_service)
+
     print(f"Loaded ego graph from: {fixture_path}\n")
 
     G = ego.graph()
