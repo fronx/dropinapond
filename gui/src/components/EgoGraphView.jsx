@@ -10,6 +10,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { PersonNode } from './PersonNode';
+import { AnalysisPanel } from './AnalysisPanel';
+import { SimplifiedMetricsLegend } from './SimplifiedMetricsLegend';
 import { loadEgoGraph, loadLatestAnalysis, parseEgoGraphForFlow } from '../lib/egoGraphLoader';
 import { createForceSimulation } from '../lib/d3Layout';
 import { updateEdgeHandles } from '../lib/edgeUtils';
@@ -25,6 +27,7 @@ export function EgoGraphView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [metadata, setMetadata] = useState(null);
+  const [analysisData, setAnalysisData] = useState(null);
   const simulationRef = useRef(null);
 
   useEffect(() => {
@@ -44,10 +47,20 @@ export function EgoGraphView() {
         }
 
         // Parse into xyflow format with analysis data
-        const { nodes: parsedNodes, edges: parsedEdges } = parseEgoGraphForFlow(egoData, analysisData);
+        const {
+          nodes: parsedNodes,
+          edges: parsedEdges,
+          clusterMetrics,
+          overallMetrics,
+          recommendations,
+          nodeNameMap
+        } = parseEgoGraphForFlow(egoData, analysisData);
 
         console.log('Loaded nodes:', parsedNodes);
         console.log('Loaded edges:', parsedEdges);
+
+        // Store analysis data for the panel
+        setAnalysisData({ clusterMetrics, overallMetrics, recommendations, nodeNameMap });
 
         setEdges(parsedEdges);
 
@@ -98,7 +111,7 @@ export function EgoGraphView() {
   }
 
   return (
-    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <div style={{ flex: 1, width: '100%' }}>
         <ReactFlow
           nodes={nodes}
@@ -115,6 +128,19 @@ export function EgoGraphView() {
           {/* <Controls /> */}
         </ReactFlow>
       </div>
+
+      {/* Simplified Metrics Legend (left side) */}
+      <SimplifiedMetricsLegend />
+
+      {/* Analysis Panel (right side) */}
+      {analysisData && (
+        <AnalysisPanel
+          clusterMetrics={analysisData.clusterMetrics}
+          overallMetrics={analysisData.overallMetrics}
+          recommendations={analysisData.recommendations}
+          nodeNameMap={analysisData.nodeNameMap}
+        />
+      )}
     </div>
   );
 }

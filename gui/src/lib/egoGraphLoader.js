@@ -89,6 +89,14 @@ export function parseEgoGraphForFlow(egoData, analysisData = null) {
     });
   }
 
+  // Build rank map from recommendations
+  const rankMap = new Map(); // nodeId -> rank (1-indexed)
+  if (analysisData?.recommendations) {
+    analysisData.recommendations.forEach((rec, index) => {
+      rankMap.set(rec.node_id, index + 1);
+    });
+  }
+
   // Add self node (focal node)
   nodes.push({
     id: egoData.self.id,
@@ -106,6 +114,18 @@ export function parseEgoGraphForFlow(egoData, analysisData = null) {
   // Add connection nodes
   egoData.connections.forEach((connection) => {
     const clusterInfo = clusterMap.get(connection.id);
+    const nodeId = connection.id;
+
+    // Extract analysis metrics for this node
+    const analysisMetrics = analysisData?.metrics ? {
+      orientationScore: analysisData.metrics.orientation_scores?.[nodeId],
+      readability: analysisData.metrics.per_neighbor_readability?.[nodeId],
+      overlap: analysisData.metrics.overlaps?.[nodeId],
+    } : {};
+
+    // Get rank from recommendations
+    const rank = rankMap.get(nodeId);
+
     nodes.push({
       id: connection.id,
       type: 'personNode',
@@ -115,14 +135,39 @@ export function parseEgoGraphForFlow(egoData, analysisData = null) {
         connectionStrength: strengthMap.get(connection.id) || 0.3,
         clusterColor: clusterInfo?.color || '#d1d5db', // Default gray if no cluster
         clusterIndex: clusterInfo?.clusterIndex ?? null,
+        analysisMetrics,
+        rank,
       },
       position: { x: 0, y: 0 }, // Will be overridden by D3 layout
     });
   });
 
-  // Add edges
+  // Add edges with recommendation-based styling
   egoData.edges.forEach((edge, index) => {
     const actualStrength = typeof edge.actual === 'number' ? edge.actual : 0.3;
+
+    // Check if the target node is a top recommendation (rank 1-5)
+    const targetRank = rankMap.get(edge.target);
+    const isTopRecommendation = targetRank && targetRank <= 5;
+    const isTopThree = targetRank && targetRank <= 3;
+
+    // Style edges to top recommendations differently
+    let strokeColor;
+    let strokeWidth;
+
+    if (isTopThree) {
+      // Top 3: bright, prominent edges
+      strokeColor = 'rgba(59, 130, 246, 0.9)'; // Bright blue for top 3
+      strokeWidth = Math.max(2.5, actualStrength * 20);
+    } else if (isTopRecommendation) {
+      // Rank 4-5: medium brightness
+      strokeColor = 'rgba(96, 165, 250, 0.7)'; // Medium blue
+      strokeWidth = Math.max(2, actualStrength * 20);
+    } else {
+      // Default: subtle gray
+      strokeColor = `rgba(100, 100, 100, ${0.3 + actualStrength * 0.4})`;
+      strokeWidth = Math.max(1, actualStrength * 20);
+    }
 
     edges.push({
       id: `${edge.source}-${edge.target}-${index}`,
@@ -133,14 +178,43 @@ export function parseEgoGraphForFlow(egoData, analysisData = null) {
         actualStrength,
         potential: edge.potential,
         metadata: edge.metadata,
+        rank: targetRank,
       },
       style: {
-        strokeWidth: Math.max(1, actualStrength * 20), // Thicker based on strength
-        stroke: `rgba(100, 100, 100, ${0.4 + actualStrength * 0.6})`, // More opaque for stronger connections
+        strokeWidth,
+        stroke: strokeColor,
       },
-      animated: false,
+      animated: false, // Animate top 3 for extra emphasis
     });
   });
 
-  return { nodes, edges };
+  // Extract cluster-level and overall metrics
+  const clusterMetrics = analysisData?.metrics ? {
+    publicLegibilityPerCluster: analysisData.metrics.public_legibility_per_cluster,
+    subjectiveAttunementPerCluster: analysisData.metrics.subjective_attunement_per_cluster,
+    heatResidualNovelty: analysisData.metrics.heat_residual_novelty,
+  } : null;
+
+  const overallMetrics = analysisData?.metrics ? {
+    attentionEntropy: analysisData.metrics.attention_entropy,
+    publicLegibilityOverall: analysisData.metrics.public_legibility_overall,
+  } : null;
+
+  const recommendations = analysisData?.recommendations || null;
+
+  // Build a map of node IDs to names for display
+  const nodeNameMap = {};
+  nodeNameMap[egoData.self.id] = egoData.self.name;
+  egoData.connections.forEach(connection => {
+    nodeNameMap[connection.id] = connection.name;
+  });
+
+  return {
+    nodes,
+    edges,
+    clusterMetrics,
+    overallMetrics,
+    recommendations,
+    nodeNameMap
+  };
 }

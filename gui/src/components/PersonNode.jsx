@@ -3,8 +3,9 @@ import { useState, useEffect } from 'react';
 import chroma from 'chroma-js';
 
 export function PersonNode({ data, selected }) {
-  const { person, isSelf, connectionStrength = 0.5, clusterColor } = data;
+  const { person, isSelf, connectionStrength = 0.5, clusterColor, analysisMetrics } = data;
   const latestAvailability = person.availability?.[0];
+  const [showTooltip, setShowTooltip] = useState(false);
 
   // Detect dark mode
   const [isDarkMode, setIsDarkMode] = useState(
@@ -74,7 +75,11 @@ export function PersonNode({ data, selected }) {
   };
 
   return (
-    <div style={nodeStyle}>
+    <div
+      style={nodeStyle}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
       {/* Handles for edge connections */}
       <Handle type="target" position={Position.Top} id="target-top" style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} id="source-bottom" style={{ opacity: 0 }} />
@@ -103,6 +108,42 @@ export function PersonNode({ data, selected }) {
       )}
 
       {person.name}
+
+      {/* Analysis metrics tooltip */}
+      {showTooltip && analysisMetrics && !isSelf && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          marginTop: '8px',
+          backgroundColor: isDarkMode ? '#1f2937' : 'white',
+          border: `1px solid ${isDarkMode ? '#374151' : '#d1d5db'}`,
+          borderRadius: '6px',
+          padding: '8px 12px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          fontSize: '0.4rem',
+          whiteSpace: 'nowrap',
+          zIndex: 1000,
+          pointerEvents: 'none',
+        }}>
+          {analysisMetrics.orientationScore !== undefined && (
+            <div style={{ marginBottom: '4px', color: isDarkMode ? '#93c5fd' : '#1e40af', fontWeight: '600' }}>
+              Orientation: {analysisMetrics.orientationScore.toFixed(2)}
+            </div>
+          )}
+          {analysisMetrics.readability !== undefined && (
+            <div style={{ marginBottom: '4px', color: isDarkMode ? '#d1d5db' : '#374151' }}>
+              Readability: {analysisMetrics.readability.toFixed(2)}
+            </div>
+          )}
+          {analysisMetrics.overlap !== undefined && (
+            <div style={{ color: isDarkMode ? '#d1d5db' : '#374151' }}>
+              Overlap: {analysisMetrics.overlap.toFixed(2)}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
