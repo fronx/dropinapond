@@ -182,37 +182,21 @@ The contact_points structure:
 
 Always list all people involved in each contact point (including yourself as "F").
 
-### 4. Compute Embeddings
+### 4. Run Analysis
 
-After adding new phrases or nodes, compute embeddings:
-
-```python
-from src.embeddings import get_embedding_service
-
-service = get_embedding_service()
-graph_name = "fronx"  # or whatever the user's graph is called
-
-# For each node with new/updated phrases
-service.add_phrases(
-    graph_name=graph_name,
-    node_id="S",
-    phrases=["urban design", "walkable cities"],
-    metadata=[
-        {"weight": 0.9, "last_updated": "2025-10-24"},
-        {"weight": 0.8, "last_updated": "2025-10-24"}
-    ]
-)
-```
-
-**When to compute**: After you've written updates to the JSON file. You can batch this - don't need to do it after every single phrase.
-
-### 5. Run Analysis (Optional)
-
-When the user asks for insights or at natural breakpoints:
+**IMPORTANT**: Always run the analysis at the end of the session (or when the user requests it) using:
 
 ```bash
-uv run python src/ego_ops.py {graph_name}
+uv run python src/ego_ops.py fronx
 ```
+
+(Replace `fronx` with the user's graph name)
+
+**What this does**:
+- Automatically computes any missing embeddings (no manual computation needed)
+- Runs all six navigation metrics
+- Generates a network visualization that opens in the browser
+- Saves detailed analysis to `data/analyses/{graph_name}_{timestamp}.json`
 
 This outputs:
 - Network clusters
@@ -241,12 +225,15 @@ Interpret the results conversationally:
 5. Look for patterns: clusters, bridges, gaps
 
 ### Closing (5 min)
-1. Compute embeddings for new phrases (can batch this)
-2. Run analysis: `uv run python src/ego_ops.py {graph_name}`
-3. Share 2-3 key insights from the analysis
+1. **Always run the analysis at the end** using: `uv run python src/ego_ops.py fronx` (replace `fronx` with their graph name)
+   - This automatically computes any missing embeddings
+   - Generates a visualization that opens in the browser
+   - Saves analysis JSON to `data/analyses/` directory
+2. Share 2-3 key insights from the analysis output
+3. Let the user know the visualization is ready in their browser
 4. Ask if they want to explore any specific question
 
-The natural rhythm is to write JSON updates as the conversation flows, then batch embedding computation at the end or at convenient breakpoints.
+The natural rhythm is to write JSON updates as the conversation flows, then **always run the analysis at the end** so the user can immediately view the results in their browser.
 
 ## Navigation Insights to Surface
 
