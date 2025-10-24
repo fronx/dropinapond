@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   ReactFlow,
@@ -11,7 +11,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { PersonNode } from './PersonNode';
 import { loadEgoGraph, parseEgoGraphForFlow } from '../lib/egoGraphLoader';
-import { applyForceLayout } from '../lib/d3Layout';
+import { createForceSimulation } from '../lib/d3Layout';
 
 const nodeTypes = {
   personNode: PersonNode,
@@ -24,6 +24,7 @@ export function EgoGraphView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [metadata, setMetadata] = useState(null);
+  const simulationRef = useRef(null);
 
   useEffect(() => {
     async function loadGraph() {
@@ -38,28 +39,35 @@ export function EgoGraphView() {
         // Parse into xyflow format
         const { nodes: parsedNodes, edges: parsedEdges } = parseEgoGraphForFlow(egoData);
 
-        // Apply D3 force-directed layout
-        const layoutNodes = applyForceLayout(parsedNodes, parsedEdges, {
-          width: 1200,
-          height: 800,
-          strength: -500,
-          distance: 200,
-          iterations: 300,
-        });
-
-        console.log('Loaded nodes:', layoutNodes);
+        console.log('Loaded nodes:', parsedNodes);
         console.log('Loaded edges:', parsedEdges);
 
-        setNodes(layoutNodes);
         setEdges(parsedEdges);
+
+        // Start animated D3 force-directed layout
+        simulationRef.current = createForceSimulation(
+          parsedNodes,
+          parsedEdges,
+          (updatedNodes) => {
+            setNodes(updatedNodes);
+          }
+        );
+
+        setLoading(false);
       } catch (err) {
         setError(err.message);
-      } finally {
         setLoading(false);
       }
     }
 
     loadGraph();
+
+    // Cleanup: stop simulation when component unmounts
+    return () => {
+      if (simulationRef.current) {
+        simulationRef.current.stop();
+      }
+    };
   }, [graphName, setNodes, setEdges]);
 
   if (loading) {

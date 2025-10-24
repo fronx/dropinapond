@@ -49,7 +49,7 @@ export function parseEgoGraphForFlow(egoData) {
 
   // Add edges
   egoData.edges.forEach((edge, index) => {
-    const actualStrength = typeof edge.actual === 'number' ? edge.actual : 0.5;
+    const actualStrength = typeof edge.actual === 'number' ? edge.actual : 0.3;
 
     edges.push({
       id: `${edge.source}-${edge.target}-${index}`,
@@ -62,12 +62,10 @@ export function parseEgoGraphForFlow(egoData) {
         metadata: edge.metadata,
       },
       style: {
-        strokeWidth: Math.max(1, actualStrength * 5),
-        stroke: `rgba(100, 100, 100, ${0.3 + actualStrength * 0.7})`,
+        strokeWidth: Math.max(1, actualStrength * 20), // Thicker based on strength
+        stroke: `rgba(100, 100, 100, ${0.4 + actualStrength * 0.6})`, // More opaque for stronger connections
       },
-      label: actualStrength > 0 ? `${(actualStrength * 100).toFixed(0)}%` : undefined,
-      labelStyle: { fontSize: 10, fill: '#666' },
-      labelBgStyle: { fill: 'white', fillOpacity: 0.7 },
+      animated: false,
     });
   });
 
