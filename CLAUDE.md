@@ -97,19 +97,20 @@ Ego graphs are JSON files with this structure (embeddings stored separately in C
   "self": {
     "id": "F",
     "name": "Your Name",
-    "phrases": [
-      {
-        "text": "topic phrase",
-        "weight": 1.0,
-        "last_updated": "2025-10-24"
-      }
-    ]
+    "phrases": [...]
   },
   "connections": [
     {
       "id": "neighbor1",
       "name": "Neighbor Name",
-      "phrases": [...]
+      "phrases": [...],
+      "capabilities": ["skill1", "skill2"],
+      "availability": [
+        {"date": "2025-10-24", "score": 0.8, "content": "Generally available"}
+      ],
+      "notes": [
+        {"date": "2025-10-24", "content": "Met at conference, shared interest in X"}
+      ]
     }
   ],
   "edges": [
@@ -117,9 +118,20 @@ Ego graphs are JSON files with this structure (embeddings stored separately in C
       "source": "F",
       "target": "neighbor1",
       "actual": 0.8,
-      "potential": 0.65
+      "channels": ["video_calls", "in_person"]
     }
-  ]
+  ],
+  "contact_points": {
+    "past": [
+      {"date": "2024-05", "people": ["F", "neighbor1"], "content": "Met at event X"}
+    ],
+    "present": [
+      {"people": ["F", "neighbor1"], "content": "Currently collaborating on Y"}
+    ],
+    "potential": [
+      {"people": ["F", "neighbor1"], "content": "Plan to work on Z together"}
+    ]
+  }
 }
 ```
 
@@ -130,6 +142,10 @@ Ego graphs are JSON files with this structure (embeddings stored separately in C
 - Each graph gets its own ChromaDB collection
 - Mean embedding computed on-demand from weighted phrase embeddings
 - Phrase `weight` is optional (defaults to 1.0)
+- `capabilities`: List of skills/expertise the person can help with
+- `availability`: Timestamped availability observations (score 0-1)
+- `notes`: Timestamped qualitative observations about the person
+- `contact_points`: Relational/historical information about interactions (past/present/potential)
 - Temporal decay not yet implemented (planned v0.3)
 
 ## Current Implementation Status

@@ -33,9 +33,27 @@
       "type": "object",
       "description": "Optional metadata about the ego graph",
       "properties": {
-        "created_at": {"type": "string", "format": "date-time"},
-        "updated_at": {"type": "string", "format": "date-time"},
+        "created_at": {"type": "string", "format": "date"},
+        "updated_at": {"type": "string", "format": "date"},
         "description": {"type": "string"}
+      }
+    },
+    "contact_points": {
+      "type": "object",
+      "description": "Historical and potential future contact events",
+      "properties": {
+        "past": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/contact_event"}
+        },
+        "present": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/contact_event"}
+        },
+        "potential": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/contact_event"}
+        }
       }
     }
   },
@@ -60,6 +78,21 @@
           "items": {
             "$ref": "#/definitions/phrase"
           }
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "Optional list of actionable skills/expertise this person has",
+          "items": {"type": "string"}
+        },
+        "availability": {
+          "type": "array",
+          "description": "Optional timestamped availability/life circumstances",
+          "items": {"$ref": "#/definitions/availability"}
+        },
+        "notes": {
+          "type": "array",
+          "description": "Optional free-form qualitative observations",
+          "items": {"$ref": "#/definitions/note"}
         },
         "metadata": {
           "type": "object",
@@ -133,6 +166,71 @@
         "metadata": {
           "type": "object",
           "description": "Optional metadata about the edge"
+        }
+      }
+    },
+    "availability": {
+      "type": "object",
+      "required": ["date", "score", "content"],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of this availability snapshot (YYYY-MM-DD)"
+        },
+        "score": {
+          "type": "number",
+          "description": "Availability score (0-1, where 1 is fully available)",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "content": {
+          "type": "string",
+          "description": "Description of availability/life circumstances"
+        }
+      }
+    },
+    "note": {
+      "type": "object",
+      "required": ["date", "content"],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of this note (YYYY-MM-DD)"
+        },
+        "content": {
+          "type": "string",
+          "description": "Free-form note content"
+        }
+      }
+    },
+    "contact_event": {
+      "type": "object",
+      "required": ["people", "content"],
+      "properties": {
+        "date": {
+          "type": "string",
+          "description": "Date or time period (e.g., '2024-05' or '2019')"
+        },
+        "people": {
+          "type": "array",
+          "description": "Node IDs involved in this event",
+          "items": {"type": "string"},
+          "minItems": 1
+        },
+        "channels": {
+          "type": "array",
+          "description": "Communication channels used for this contact",
+          "items": {"type": "string"}
+        },
+        "frequency": {
+          "type": "string",
+          "description": "How often this contact occurs (e.g., 'weekly', 'monthly', 'sporadic')"
+        },
+        "content": {
+          "type": "string",
+          "description": "Description of the contact event"
         }
       }
     }

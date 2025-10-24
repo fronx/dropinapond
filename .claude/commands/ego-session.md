@@ -45,7 +45,9 @@ As the conversation flows, extract structured information:
 - **ID**: Generate from name (e.g., "Sarah Johnson" → "SJ" or "sarah")
 - **Phrases**: What are they interested in? What do they talk about?
 - **Weights**: How central is each topic to them? (user's perception)
-- **Is_self**: Always false for neighbors
+- **Capabilities**: Skills or expertise they could help with (list of strings)
+- **Availability**: Timestamped observations about their current availability (score 0-1, date, content)
+- **Notes**: Timestamped observations about personality, interaction quality, relationship dynamics
 
 ### For Each Interaction (Edges)
 - **Source**: Always the focal node (user)
@@ -59,13 +61,18 @@ As the conversation flows, extract structured information:
 
 ## File Operations Philosophy
 
-Update incrementally as the conversation flows. After each meaningful exchange where you learn something new, update the JSON file.
+Update incrementally as the conversation flows. After each meaningful exchange where you learn something new, update the graph file.
+
+**Graph structure**:
+- All information lives in a single file: `data/ego_graphs/{name}.json`
+- Person-specific data: phrases, capabilities, availability, notes
+- Relational data: edges, contact_points (past/present/potential)
 
 **Natural workflow**:
 1. User mentions a person or topic
 2. Extract the relevant information
 3. Read the current JSON file
-4. Add/update the relevant nodes/phrases/edges
+4. Add/update the relevant information
 5. Write the updated JSON back
 6. Continue the conversation
 
@@ -115,7 +122,13 @@ Ask the user what to call their graph, or use their first name. This becomes the
 {
   "id": "S",
   "name": "Sarah",
-  "is_self": false,
+  "capabilities": ["urban planning", "community organizing"],
+  "availability": [
+    {"date": "2025-10-24", "score": 0.7, "content": "Generally available, working remotely"}
+  ],
+  "notes": [
+    {"date": "2025-10-24", "content": "Met at conference, shared interest in walkable cities"}
+  ],
   "phrases": [
     {"text": "urban design", "weight": 0.9, "last_updated": "2025-10-24"},
     {"text": "walkable cities", "weight": 0.8, "last_updated": "2025-10-24"}
@@ -128,9 +141,46 @@ Ask the user what to call their graph, or use their first name. This becomes the
 {
   "source": "F",
   "target": "S",
-  "actual": 0.7
+  "actual": 0.7,
+  "channels": ["video_calls", "in_person"]
 }
 ```
+
+### 3.5. Update Contact Points
+
+For relational information like contact points (past events, current projects, future plans), add to the `contact_points` section in the main graph file:
+
+**Recording a past contact**:
+```json
+"contact_points": {
+  "past": [
+    {
+      "date": "2024-05",
+      "people": ["F", "S", "J"],
+      "content": "Met Sarah at Justin's dinner party"
+    }
+  ]
+}
+```
+
+**Recording a potential future interaction**:
+```json
+"contact_points": {
+  "potential": [
+    {
+      "people": ["F", "S"],
+      "content": "Plan to collaborate on walkable cities project"
+    }
+  ]
+}
+```
+
+The contact_points structure:
+- `contact_points.past`: Historical events, how people met, past projects
+- `contact_points.present`: Current active opportunities or ongoing interactions
+- `contact_points.potential`: Future plans, hopes for reconnection
+
+Always list all people involved in each contact point (including yourself as "F").
 
 ### 4. Compute Embeddings
 
