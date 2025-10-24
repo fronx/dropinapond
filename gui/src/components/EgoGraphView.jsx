@@ -93,26 +93,6 @@ export function EgoGraphView() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div style={{
-        backgroundColor: 'white',
-        borderBottom: '1px solid #e5e7eb',
-        padding: '1rem 1.5rem'
-      }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937' }}>
-          graphName
-        </h1>
-        {/* {metadata?.description && (
-          <p style={{ fontSize: '0.875rem', color: '#4b5563', marginTop: '0.25rem' }}>
-            {metadata.description}
-          </p>
-        )} */}
-        <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
-          {nodes.length} nodes, {edges.length} edges
-        </div>
-      </div>
-
-      {/* Graph visualization */}
       <div style={{ flex: 1, width: '100%' }}>
         <ReactFlow
           nodes={nodes}
@@ -126,13 +106,7 @@ export function EgoGraphView() {
           maxZoom={2}
         >
           <Background />
-          <Controls />
-          <MiniMap
-            nodeColor={(node) => node.data?.isSelf ? '#3b82f6' : '#d1d5db'}
-            nodeStrokeWidth={3}
-            zoomable
-            pannable
-          />
+          {/* <Controls /> */}
         </ReactFlow>
       </div>
     </div>
