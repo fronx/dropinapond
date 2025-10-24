@@ -62,6 +62,15 @@ It's **distributed and privacy-preserving**: each person runs local computations
 - On-demand clustering (compute transiently, never store)
 - Implementation roadmap and migration path
 
+### 7. [Temporal Dynamics](TEMPORAL_DYNAMICS.md)
+**Living semantic fields: memory without historical baggage**
+
+- The living graph model (no event log, just continuous decay)
+- Update algorithm: exponential decay + refresh on re-mention
+- Seasonal memory (dormant topics fade, revive when mentioned)
+- Edge weight decay (past/present/future dimensions)
+- Cognitive alignment (mirrors forgetting curves)
+
 ## Quick Start
 
 If you just want to see it work:

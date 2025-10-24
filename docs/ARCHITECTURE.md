@@ -15,17 +15,20 @@ Each person maintains a JSON file representing their **epistemic ego network** -
         {
           "text": "audio embeddings",
           "embedding": [0.82, 0.31, -0.15, 0.41, 0.52],
-          "weight": 1.0
+          "weight": 1.0,
+          "last_updated": "2025-10-15"
         },
         {
           "text": "semantic search",
           "embedding": [0.78, 0.25, -0.09, 0.38, 0.49],
-          "weight": 0.9
+          "weight": 0.9,
+          "last_updated": "2025-10-12"
         },
         {
           "text": "navigation interfaces",
           "embedding": [0.71, 0.33, -0.11, 0.29, 0.44],
-          "weight": 0.7
+          "weight": 0.7,
+          "last_updated": "2025-09-28"
         }
       ],
       "embedding": {
@@ -76,12 +79,15 @@ Each person maintains a JSON file representing their **epistemic ego network** -
 - `phrases`: Array of phrase-level embeddings (the **primary representation**)
   - `text`: The phrase itself
   - `embedding`: Semantic vector for this specific phrase
-  - `weight`: Importance/salience (0-1)
+  - `weight`: Current activation (0-1) - **decays exponentially over time**
+  - `last_updated`: Timestamp of most recent mention - used for decay computation
 - `embedding.mean`: Optional pre-computed summary (convenience, not ground truth)
 - `embedding.covariance`: Optional uncertainty estimate
 - `is_self`: Ground truth (true) or prediction (false)
-- `prediction_confidence`: (0-1) How certain you are about this prediction (only for neighbors)
+- `prediction_confidence`: (0-1) How certain you are about this prediction (only for neighbors, also decays)
 - `last_updated`: When you last refined this prediction (only for neighbors)
+
+**Temporal dynamics**: Phrase weights decay exponentially (`w *= exp(-Δt / τ)` with τ ≈ 40 days). Re-mentioning a phrase bumps its weight back up. This creates a **living semantic field** that naturally forgets dormant topics and remembers actively-used concepts. See [TEMPORAL_DYNAMICS.md](TEMPORAL_DYNAMICS.md) for details.
 
 **Critical insight**: This is an **epistemic graph** of **continuous semantic fields**, not discrete position vectors. Blake also maintains their own ego graph with their ground truth field and their prediction of your field. Your prediction of Blake's field may differ from Blake's ground truth field. This asymmetry is fundamental to the privacy model.
 

@@ -109,11 +109,13 @@ Define your network in `fixtures/ego_graphs/<name>.json`:
 **Edge types**:
 - `potential`: Semantic alignment (auto-computed from embeddings if not provided)
 - `actual`: Real interaction strength
-  - `past`: Historical interactions (0-1)
-  - `present`: Current interactions (0-1)
-  - `future`: Planned interactions (0-1)
+  - `past`: Historical interactions (0-1, decays slowly)
+  - `present`: Current interactions (0-1, decays quickly)
+  - `future`: Planned interactions (0-1, medium decay)
 
 The gap between `potential` and `actual` reveals latent opportunities.
+
+**Temporal model**: Phrase weights and edge strengths decay exponentially over time (τ ≈ 40 days). The graph represents a **living present**, not an archive. See [Temporal Dynamics](docs/TEMPORAL_DYNAMICS.md).
 
 ## Dependencies
 

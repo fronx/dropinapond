@@ -28,13 +28,14 @@
 **New features**:
 - [ ] Conversational interface (Claude-based ego graph builder)
 - [ ] Embedding computation pipeline (sentence transformers integration)
-- [ ] **Temporal dynamics**: Edge decay, momentum in ties, trajectory prediction
+- [ ] **Temporal dynamics**: Exponential phrase decay, edge weight decay, trajectory prediction (see [TEMPORAL_DYNAMICS.md](../docs/TEMPORAL_DYNAMICS.md))
 - [ ] **Rank-2 attunement adapter**: Flexible attunement across pockets with residual directions
 - [ ] **Active inference loop**: Predict → interact → update belief cycle
 - [ ] **Prediction-error exchange protocol**: Cross-node handshake exchanging epistemic updates
 - [ ] **Projected mutual predictability**: Refine potential edges beyond cosine similarity
-- [ ] Confidence tracking for predicted embeddings
+- [ ] Confidence tracking with decay for predicted embeddings
 - [ ] Multi-hop navigation (bridges to distant regions)
+- [ ] Periodic checkpointing (optional, for longitudinal analysis)
 - [ ] Web UI (optional, for visualization)
 
 ## Running the Example
