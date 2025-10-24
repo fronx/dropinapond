@@ -1,0 +1,135 @@
+{
+  "version": "1.0",
+  "description": "Static semantic labels for ego graph metrics. Maps numerical ranges to human-readable phrases for UI display.",
+  "metrics": {
+    "readability": {
+      "theoretical_range": {
+        "min": -1.0,
+        "max": 1.0
+      },
+      "conceptual_meaning": "Measures how well a neighbor can understand and model the focal person's semantic interests based on ridge regression R². Higher values indicate the neighbor understands what the focal person is about.",
+      "labels": [
+        {
+          "min": -1.0,
+          "max": 0.05,
+          "label": "opaque",
+          "description": "Unable to reconstruct interests; semantic fields are orthogonal or misaligned"
+        },
+        {
+          "min": 0.05,
+          "max": 0.15,
+          "label": "barely legible",
+          "description": "Minimal understanding; can capture only surface-level aspects of interests"
+        },
+        {
+          "min": 0.15,
+          "max": 0.30,
+          "label": "somewhat understood",
+          "description": "Moderate reconstruction capability; grasps general themes but misses nuances"
+        },
+        {
+          "min": 0.30,
+          "max": 0.50,
+          "label": "well understood",
+          "description": "Strong reconstruction; neighbor's semantic position effectively models interests"
+        },
+        {
+          "min": 0.50,
+          "max": 1.0,
+          "label": "highly transparent",
+          "description": "Exceptional understanding; neighbor's field nearly perfectly predicts interests"
+        }
+      ]
+    },
+    "overlap": {
+      "theoretical_range": {
+        "min": 0.0,
+        "max": 1.0
+      },
+      "conceptual_meaning": "Jaccard index measuring shared neighbors between the focal person and a connection. High overlap means redundant networks (know same people), while low overlap means access to distinct social circles (structural holes).",
+      "labels": [
+        {
+          "min": 0.0,
+          "max": 0.05,
+          "label": "distinct circles",
+          "description": "Almost no shared contacts. Strong structural hole - this connection provides access to an entirely separate network"
+        },
+        {
+          "min": 0.05,
+          "max": 0.15,
+          "label": "minimal overlap",
+          "description": "Very few mutual connections. Weak bridge offering diverse perspectives and novel information flow"
+        },
+        {
+          "min": 0.15,
+          "max": 0.35,
+          "label": "moderate overlap",
+          "description": "Some shared acquaintances. Partial bridge between networks with both familiar and novel contacts"
+        },
+        {
+          "min": 0.35,
+          "max": 0.60,
+          "label": "high overlap",
+          "description": "Many mutual connections. Strong embeddedness within the same social cluster - redundant but reinforcing"
+        },
+        {
+          "min": 0.60,
+          "max": 0.85,
+          "label": "heavy overlap",
+          "description": "Most contacts are shared. Highly embedded in same tight-knit group with limited novelty potential"
+        },
+        {
+          "min": 0.85,
+          "max": 1.0,
+          "label": "nearly identical networks",
+          "description": "Almost complete neighbor overlap. Redundant connection providing minimal new network access"
+        }
+      ]
+    },
+    "orientation_score": {
+      "theoretical_range": {
+        "min": -1.25,
+        "max": 3.7
+      },
+      "conceptual_meaning": "Composite metric for strategic network navigation. Combines network exploration (low overlap), mutual understanding (legibility and attunement), semantic relevance (topical match), and reliability (stability). Higher scores indicate better candidates for next interaction.",
+      "labels": [
+        {
+          "min": -1.25,
+          "max": 0.8,
+          "label": "poor fit",
+          "description": "Low strategic value. Either semantically misaligned, poorly understood, or part of an unfamiliar cluster. Consider only if exploring entirely new territory"
+        },
+        {
+          "min": 0.8,
+          "max": 1.5,
+          "label": "limited potential",
+          "description": "Below-average strategic value. May have network overlap or modest semantic alignment, but lacks strong mutual understanding or topical relevance"
+        },
+        {
+          "min": 1.5,
+          "max": 2.1,
+          "label": "moderate potential",
+          "description": "Solid strategic value. Balanced combination of network novelty, mutual legibility, and semantic relevance. A reasonable choice for next interaction"
+        },
+        {
+          "min": 2.1,
+          "max": 2.7,
+          "label": "high potential",
+          "description": "Strong strategic value. Excellent balance of exploration (non-overlapping network), understanding (good attunement), and topical alignment. Prioritize for next interaction"
+        },
+        {
+          "min": 2.7,
+          "max": 3.3,
+          "label": "exceptional fit",
+          "description": "Outstanding strategic value. Near-optimal across all dimensions: opens new network territory, strong mutual understanding, highly relevant to current focus. Top priority for engagement"
+        },
+        {
+          "min": 3.3,
+          "max": 3.7,
+          "label": "ideal target",
+          "description": "Maximum strategic value. Perfect storm of network novelty, mutual legibility, cluster attunement, and semantic alignment. Extremely rare—pursue immediately if stable"
+        }
+      ]
+    }
+  }
+}
