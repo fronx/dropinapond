@@ -1,0 +1,8 @@
+pyproject.toml
+src/ego_ops.py
+src/translation_hints.py
+src/dropinapond.egg-info/PKG-INFO
+src/dropinapond.egg-info/SOURCES.txt
+src/dropinapond.egg-info/dependency_links.txt
+src/dropinapond.egg-info/requires.txt
+src/dropinapond.egg-info/top_level.txt

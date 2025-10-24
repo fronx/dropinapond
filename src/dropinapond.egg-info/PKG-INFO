@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: dropinapond
+Version: 0.1.0
+Requires-Python: >=3.9
+Requires-Dist: numpy<2.0,>=1.24
+Requires-Dist: networkx>=3.0
+Requires-Dist: scipy>=1.10
+Requires-Dist: scikit-learn>=1.2

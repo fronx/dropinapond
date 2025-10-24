@@ -1,0 +1,562 @@
+# ego_ops.py
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Dict, List, Iterable, Tuple, Optional
+import json
+import sys
+from pathlib import Path
+import numpy as np
+import networkx as nx
+from scipy.linalg import expm
+from scipy.stats import entropy as shannon_entropy
+from sklearn.cluster import KMeans
+
+# ---------------------------
+# Core data structure
+# ---------------------------
+
+@dataclass
+class EgoData:
+    """
+    Local ego graph around focal node F.
+
+    nodes: list of node IDs including F and its neighbors (strings or ints).
+    focal: the ID of the focal node (e.g., "F").
+    embeddings: dict node_id -> np.ndarray of shape (d,)
+    edges: iterable of (u, v, dims) where dims is a dict with edge dimensions:
+           - 'potential': derived from embedding similarity (default)
+           - 'actual': real interaction strength (optional)
+           - 'past', 'present', 'future': temporal dimensions (optional)
+           Legacy format (u, v, w) or (u, v) also supported.
+    names: dict node_id -> human-readable name (optional)
+    """
+    nodes: List[str]
+    focal: str
+    embeddings: Dict[str, np.ndarray]
+    edges: Iterable[Tuple[str, str, Optional[float | Dict[str, float]]]]
+    names: Optional[Dict[str, str]] = None
+
+    def graph(self, edge_dim: str = 'potential') -> nx.Graph:
+        """
+        Build a NetworkX graph using the specified edge dimension.
+
+        edge_dim: which dimension to use for edge weights ('potential', 'actual', etc.)
+        """
+        G = nx.Graph()
+        for u in self.nodes:
+            G.add_node(u)
+        for e in self.edges:
+            if len(e) == 2:
+                u, v = e
+                w = 1.0
+            else:
+                u, v, dims = e
+                if dims is None:
+                    w = 1.0
+                elif isinstance(dims, dict):
+                    w = dims.get(edge_dim, dims.get('potential', 1.0))
+                else:
+                    w = float(dims)
+            if u in G and v in G:
+                G.add_edge(u, v, weight=float(w))
+        return G
+
+    def Z(self, subset: Optional[Iterable[str]] = None) -> np.ndarray:
+        if subset is None:
+            subset = self.nodes
+        return np.stack([self.embeddings[n] for n in subset], axis=0)
+
+# ---------------------------
+# JSON loading
+# ---------------------------
+
+def load_ego_from_json(filepath: str | Path, focal_id: str = "F") -> EgoData:
+    """
+    Load ego graph from JSON file.
+
+    Expected format:
+    {
+      "F": {"name": "...", "embedding": [...], "keyphrases": {...}},
+      "neighbor1": {"name": "...", "embedding": [...], ...},
+      ...
+      "edges": [  # optional
+        {"u": "F", "v": "neighbor1", "potential": 0.8, "actual": 0.5},
+        ...
+      ]
+    }
+
+    If edges are not provided, derives potential edges from embedding cosine similarity.
+    """
+    with open(filepath) as f:
+        data = json.load(f)
+
+    # Extract edges if provided, otherwise empty list
+    edges_data = data.pop("edges", [])
+
+    # Nodes, embeddings, and names
+    nodes = list(data.keys())
+    embeddings = {
+        node_id: np.array(node_data["embedding"], dtype=float)
+        for node_id, node_data in data.items()
+    }
+    names = {
+        node_id: node_data.get("name", node_id)
+        for node_id, node_data in data.items()
+    }
+
+    # Build edges with multi-dimensional structure
+    # Start by deriving potential edges from all embeddings
+    edge_dict = {}  # (u, v) -> dims dict
+
+    for i, u in enumerate(nodes):
+        for v in nodes[i+1:]:
+            cos_sim = max(0.0, _cos(embeddings[u], embeddings[v]))
+            if cos_sim > 0.1:  # threshold for edge creation
+                key = tuple(sorted([u, v]))
+                edge_dict[key] = {"potential": cos_sim}
+
+    # Merge in provided edges (adds actual, temporal, etc. dimensions)
+    if edges_data:
+        for e in edges_data:
+            u, v = e["u"], e["v"]
+            key = tuple(sorted([u, v]))
+            extra_dims = {k: val for k, val in e.items() if k not in ["u", "v"]}
+
+            if key in edge_dict:
+                edge_dict[key].update(extra_dims)
+            else:
+                # Edge provided without potential (no embedding similarity)
+                edge_dict[key] = extra_dims
+
+    # Convert to list format
+    edges = [(u, v, dims) for (u, v), dims in edge_dict.items()]
+
+    return EgoData(nodes=nodes, focal=focal_id, embeddings=embeddings, edges=edges, names=names)
+
+# ---------------------------
+# Utilities
+# ---------------------------
+
+def _r2_vector(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """
+    R^2 for a single vector target (treat dimensions as datapoints).
+    """
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+    num = np.sum((y_true - y_pred) ** 2)
+    denom = np.sum((y_true - y_true.mean()) ** 2)
+    if denom <= 1e-12:
+        return 1.0 if num <= 1e-12 else 0.0
+    return 1.0 - (num / denom)
+
+def _cos(a: np.ndarray, b: np.ndarray, eps: float = 1e-12) -> float:
+    na = np.linalg.norm(a)
+    nb = np.linalg.norm(b)
+    if na < eps or nb < eps:
+        return 0.0
+    return float(np.dot(a, b) / (na * nb))
+
+def _normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+    n = np.linalg.norm(v)
+    return v / (n + eps)
+
+# ---------------------------
+# 1) Ego picture: overlaps, clustering, attention entropy
+# ---------------------------
+
+def jaccard_overlap(G: nx.Graph, focal: str, j: str) -> float:
+    """
+    overlap_{Fj} = |N(F) ∩ N(j)| / |N(F) ∪ N(j)| on the ego set.
+    """
+    NF = set(G.neighbors(focal))
+    Nj = set(G.neighbors(j))
+    inter = len(NF & Nj)
+    uni = len(NF | Nj)
+    return 0.0 if uni == 0 else inter / uni
+
+def ego_clusters(G: nx.Graph, focal: str, method: str = "greedy") -> List[set]:
+    """
+    Cluster neighbors of F inside the ego graph (exclude F itself).
+    Returns a list of sets (node IDs) for clusters among N(F).
+    """
+    H = nx.Graph()
+    nbrs = [n for n in G.neighbors(focal)]
+    H.add_nodes_from(nbrs)
+    for u in nbrs:
+        for v in nbrs:
+            if u < v and G.has_edge(u, v):
+                H.add_edge(u, v, **G.get_edge_data(u, v))
+    if H.number_of_edges() == 0 or H.number_of_nodes() <= 2:
+        return [set(nbrs)] if nbrs else []
+    if method == "greedy":
+        comms = nx.algorithms.community.greedy_modularity_communities(H, weight="weight")
+        return [set(c) for c in comms]
+    else:
+        # fallback: 2-means on embeddings of neighbors using graph degree as a tie-breaker
+        # (only used if you switch method)
+        raise NotImplementedError
+
+def tie_weight_entropy(G: nx.Graph, focal: str, clusters: List[set]) -> float:
+    """
+    Entropy of attention/tie weights from F to clusters.
+    """
+    weights = []
+    for C in clusters:
+        wC = 0.0
+        for j in C:
+            if G.has_edge(focal, j):
+                wC += G[focal][j].get("weight", 1.0)
+        weights.append(wC)
+    w = np.array(weights, dtype=float)
+    if w.sum() <= 1e-12:
+        return 0.0
+    p = w / w.sum()
+    return float(shannon_entropy(p, base=2))
+
+# ---------------------------
+# 2) Public legibility (neighbors -> you)
+# ---------------------------
+
+def public_legibility_r2(ego: EgoData, neighbors: Iterable[str], lam: float = 1e-3) -> float:
+    r"""
+    Fit: \hat z_F = sum_j alpha_j z_j with ridge on coefficients alpha (L2).
+    Closed form: alpha = (Z Z^T + lam I)^{-1} Z z_F, where Z is (n x d).
+    """
+    F = ego.focal
+    zF = ego.embeddings[F]
+    nbrs = list(neighbors)
+    if len(nbrs) == 0:
+        return 0.0
+    Z = np.stack([ego.embeddings[j] for j in nbrs], axis=0)  # (n, d)
+    ZZt = Z @ Z.T  # (n, n)
+    A = ZZt + lam * np.eye(len(nbrs))
+    b = Z @ zF  # (n,)
+    alpha = np.linalg.solve(A, b)  # (n,)
+    z_hat = alpha @ Z  # (d,)
+    return _r2_vector(zF, z_hat)
+
+def public_legibility_r2_per_neighbor(ego: EgoData, lam: float = 1e-3) -> Dict[str, float]:
+    """
+    R^2 when using a single neighbor j to reconstruct z_F (ridge).
+    alpha_j closed form reduces to (z_j·z_F)/(||z_j||^2 + lam).
+    """
+    F = ego.focal
+    zF = ego.embeddings[F]
+    out = {}
+    for j in ego.nodes:
+        if j == F:
+            continue
+        zj = ego.embeddings[j]
+        denom = np.dot(zj, zj) + lam
+        alpha_j = float(np.dot(zj, zF) / denom)
+        z_hat = alpha_j * zj
+        out[j] = _r2_vector(zF, z_hat)
+    return out
+
+# ---------------------------
+# 3) Subjective attunement (you -> neighbors)
+# ---------------------------
+
+def subjective_attunement_r2(ego: EgoData, cluster: Iterable[str], lam: float = 1e-3) -> float:
+    """
+    For each neighbor j in cluster, fit a scalar beta_j s.t. beta_j z_F ~ z_j (ridge on beta).
+    beta_j = (z_F·z_j)/(||z_F||^2 + lam).
+    Aggregate into a single R^2 over all neighbors and dimensions.
+    """
+    F = ego.focal
+    zF = ego.embeddings[F]
+    denom = np.dot(zF, zF) + lam
+    C = list(cluster)
+    if len(C) == 0:
+        return 0.0
+    # Ground truth matrix (n, d) and predictions (n, d)
+    Ztrue = np.stack([ego.embeddings[j] for j in C], axis=0)
+    betas = [float(np.dot(zF, ego.embeddings[j]) / denom) for j in C]
+    Zpred = np.stack([b * zF for b in betas], axis=0)
+    # Vectorized R^2 over n*d entries
+    y_true = Ztrue.flatten()
+    y_pred = Zpred.flatten()
+    num = np.sum((y_true - y_pred) ** 2)
+    denom_all = np.sum((y_true - y_true.mean()) ** 2)
+    if denom_all <= 1e-12:
+        return 1.0 if num <= 1e-12 else 0.0
+    return float(1.0 - num / denom_all)
+
+# ---------------------------
+# 4) Heat-residual (novelty vs pocket at small t)
+# ---------------------------
+
+def heat_residual_norm(
+    ego: EgoData,
+    pocket: Iterable[str],
+    t: float = 0.1,
+    use_normalized: bool = True
+) -> float:
+    """
+    s_F^{(k)}(t) = || z_F - (e^{-t L} Z)_F || where L is the (normalized) Laplacian
+    on the subgraph induced by {F} ∪ pocket.
+    """
+    F = ego.focal
+    nodes = [F] + [n for n in pocket if n != F]
+    idx = {n: i for i, n in enumerate(nodes)}
+    # Build adjacency
+    G = ego.graph().subgraph(nodes).copy()
+    n = len(nodes)
+    A = np.zeros((n, n))
+    for u, v, d in G.edges(data=True):
+        w = d.get("weight", 1.0)
+        i, j = idx[u], idx[v]
+        A[i, j] = A[j, i] = w
+    dvec = A.sum(axis=1)
+    if use_normalized:
+        with np.errstate(divide='ignore'):
+            invsqrt = np.where(dvec > 0, 1.0 / np.sqrt(dvec), 0.0)
+        L = np.eye(n) - (invsqrt[:, None] * A * invsqrt[None, :])
+    else:
+        L = np.diag(dvec) - A
+    K = expm(-t * L)  # heat kernel
+    Z = ego.Z(nodes)  # (n, d)
+    HZ = K @ Z
+    zF = ego.embeddings[F]
+    return float(np.linalg.norm(zF - HZ[idx[F]]))
+
+# ---------------------------
+# 5) Translation vectors and query shaping
+# ---------------------------
+
+def pocket_centroid(ego: EgoData, pocket: Iterable[str]) -> np.ndarray:
+    X = np.stack([ego.embeddings[n] for n in pocket], axis=0)
+    return X.mean(axis=0)
+
+def translate_query(q: np.ndarray, tvec: np.ndarray, alpha: float) -> np.ndarray:
+    """
+    q_k = normalize(q + alpha * t_k)
+    """
+    return _normalize(q + alpha * tvec)
+
+# ---------------------------
+# 6) Orientation score
+# ---------------------------
+
+@dataclass
+class OrientationWeights:
+    lam1: float = 1.0  # low-overlap benefit
+    lam2: float = 1.0  # public legibility
+    lam3: float = 1.0  # subjective attunement to cluster
+    lam4: float = 1.0  # topical match after translation
+    lam5: float = 0.5  # penalty for instability
+
+def orientation_scores(
+    ego: EgoData,
+    clusters: List[set],
+    target_pocket_by_node: Dict[str, int],
+    q_base: np.ndarray,
+    home_pocket_idx: int,
+    alpha: float = 0.2,
+    instabilities: Optional[Dict[str, float]] = None,
+    weights: OrientationWeights = OrientationWeights(),
+    ridge_lam: float = 1e-3
+) -> Dict[str, float]:
+    """
+    Compute per-neighbor Score(j) using only ego info.
+    target_pocket_by_node: mapping node -> cluster index it belongs to.
+    """
+    G = ego.graph()
+    F = ego.focal
+    # Precompute pieces
+    # 1 - overlap
+    one_minus_overlap = {
+        j: 1.0 - jaccard_overlap(G, F, j)
+        for j in G.neighbors(F)
+    }
+    # R^2_in per neighbor (single-neighbor reconstruction)
+    r2_in_per_neighbor = public_legibility_r2_per_neighbor(ego, lam=ridge_lam)
+    # R^2_out for each pocket
+    r2_out_by_pocket = {
+        k: subjective_attunement_r2(ego, clusters[k], lam=ridge_lam)
+        for k in range(len(clusters))
+    }
+    # Translation vectors and translated query per pocket
+    mu_home = pocket_centroid(ego, clusters[home_pocket_idx])
+    t_by_pocket = {k: pocket_centroid(ego, clusters[k]) - mu_home for k in range(len(clusters))}
+    qk_by_pocket = {k: translate_query(q_base, t_by_pocket[k], alpha=alpha) for k in t_by_pocket}
+    # Instability defaults
+    inst = instabilities or {}
+    # Scores
+    out: Dict[str, float] = {}
+    for j in G.neighbors(F):
+        k = target_pocket_by_node.get(j, None)
+        cos_term = _cos(qk_by_pocket[k], ego.embeddings[j]) if k is not None else 0.0
+        score = (
+            weights.lam1 * one_minus_overlap[j]
+            + weights.lam2 * r2_in_per_neighbor.get(j, 0.0)
+            + weights.lam3 * (r2_out_by_pocket.get(k, 0.0) if k is not None else 0.0)
+            + weights.lam4 * cos_term
+            - weights.lam5 * inst.get(j, 0.0)
+        )
+        out[j] = float(score)
+    return out
+
+def cluster_residual_direction(ego: EgoData, cluster, lam: float = 1e-3):
+    F = ego.focal
+    zF = ego.embeddings[F]
+    denom = np.dot(zF, zF) + lam
+    Rs = []
+    for j in cluster:
+        zj = ego.embeddings[j]
+        beta = float(np.dot(zF, zj) / denom)
+        Rs.append(zj - beta * zF)
+    R = np.stack(Rs, axis=0)  # (n,d)
+    rbar = R.mean(axis=0)
+    nrm = np.linalg.norm(rbar)
+    t_hat = rbar / (nrm + 1e-12)
+    # average residual energy (for gating/novelty)
+    avg_residual_norm = float(np.mean(np.sum(R**2, axis=1))**0.5)
+    return t_hat, avg_residual_norm
+
+def subjective_attunement_r2_rank2(ego: EgoData, cluster, lam: float = 1e-3):
+    # Attunement using span{z_F, t_k} with ridge on the 2 coefficients per neighbor
+    F = ego.focal
+    zF = ego.embeddings[F]
+    t_hat, _ = cluster_residual_direction(ego, cluster, lam=lam)
+    # Orthonormalize basis with simple Gram-Schmidt
+    u1 = zF / (np.linalg.norm(zF) + 1e-12)
+    t_ = t_hat - np.dot(u1, t_hat) * u1
+    u2 = t_ / (np.linalg.norm(t_) + 1e-12)
+    B = np.stack([u1, u2], axis=1)  # (d,2)
+    Ztrue = np.stack([ego.embeddings[j] for j in cluster], axis=0)  # (n,d)
+    BtB = B.T @ B  # ~ I, but keep general
+    A = BtB + lam * np.eye(2)
+    Bt = B.T
+    # Fit 2 coeffs per neighbor independently
+    coeffs = (np.linalg.solve(A, Bt @ Ztrue.T)).T  # (n,2)
+    Zpred = (B @ coeffs.T).T  # (n,d)
+    y_true = Ztrue.flatten()
+    y_pred = Zpred.flatten()
+    num = np.sum((y_true - y_pred) ** 2)
+    denom_all = np.sum((y_true - y_true.mean()) ** 2)
+    return 1.0 - (num / denom_all) if denom_all > 1e-12 else (1.0 if num <= 1e-12 else 0.0)
+
+def gated_attunement_score(ego, cluster, tau=0.3, lam=1e-3):
+    r1 = subjective_attunement_r2(ego, cluster, lam=lam)
+    if r1 >= tau:
+        return r1
+    r2 = subjective_attunement_r2_rank2(ego, cluster, lam=lam)
+    # Only trust the richer model if it materially improves and exceeds gate
+    if r2 - r1 >= 0.1 and r2 >= tau:
+        return r2
+    # Treat as novelty: return 0 so orientation leans on overlap/heat/cosine-after-translation
+    return 0.0
+
+def diffusion_distance_to_pocket(ego, pocket, t=0.25, eps=1e-12):
+    G = ego.graph()
+    nodes = list(ego.nodes)
+    idx = {n:i for i,n in enumerate(nodes)}
+    n = len(nodes)
+    A = np.zeros((n,n))
+    for u,v,d in G.edges(data=True):
+        i,j = idx[u], idx[v]
+        w = d.get("weight",1.0)
+        A[i,j]=A[j,i]=w
+    dvec = A.sum(1)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        Dinv = np.where(dvec>0, 1.0/dvec, 0.0)
+    # random-walk Laplacian
+    Lrw = np.eye(n) - (Dinv[:,None]*A)
+    K = expm(-t*Lrw)                 # heat kernel
+    pi = dvec/ (dvec.sum()+eps)      # stationary weights
+    rF = K[idx[ego.focal]]
+    rP = np.mean([K[idx[j]] for j in pocket], axis=0)
+    diff = rF - rP
+    D2 = np.sum((diff**2)/(pi+eps))
+    return float(np.sqrt(D2))
+
+if __name__ == "__main__":
+    # Get filename from command line
+    if len(sys.argv) < 2:
+        print("Usage: python src/ego_ops.py <name>")
+        print("Example: python src/ego_ops.py fronx")
+        sys.exit(1)
+
+    name = sys.argv[1]
+    fixture_path = Path(__file__).parent.parent / "fixtures" / "ego_graphs" / f"{name}.json"
+    ego = load_ego_from_json(fixture_path)
+    print(f"Loaded ego graph from: {fixture_path}\n")
+
+    G = ego.graph()
+    F = ego.focal
+    neighbors = list(G.neighbors(F))
+
+    # Helper to format node as "Name (id)" or just "id" if no name
+    def format_node(node_id):
+        if ego.names and node_id in ego.names:
+            return f"{ego.names[node_id]} ({node_id})"
+        return node_id
+
+    # 1) Ego picture
+    overlaps = {j: jaccard_overlap(G, F, j) for j in neighbors}
+    clusters = ego_clusters(G, F)  # expect [{L,P,K}, {S,T,R}, optionally {B}] depending on edges
+    # Ensure B is assigned: put singleton cluster if needed
+    if not any("B" in C for C in clusters):
+        clusters.append({"B"})
+    # Entropy of attention across clusters
+    H = tie_weight_entropy(G, F, clusters)
+
+    # Map node -> cluster index
+    pocket_by_node = {}
+    for k, C in enumerate(clusters):
+        for n in C:
+            pocket_by_node[n] = k
+
+    # 2) Public legibility
+    r2_in_all = public_legibility_r2(ego, neighbors, lam=1e-3)
+    r2_in_per_cluster = {
+        k: public_legibility_r2(ego, clusters[k], lam=1e-3)
+        for k in range(len(clusters))
+    }
+    r2_in_per_neighbor = public_legibility_r2_per_neighbor(ego, lam=1e-3)
+
+    # 3) Subjective attunement
+    r2_out = {k: subjective_attunement_r2(ego, clusters[k], lam=1e-3) for k in range(len(clusters))}
+
+    # 4) Heat-residual novelty vs each pocket
+    s_t = {k: heat_residual_norm(ego, clusters[k], t=0.12, use_normalized=True) for k in range(len(clusters))}
+
+    # 5) Translation vectors and query shaping
+    # Assume home pocket = one containing most of F's tie-weight (choose by max cosine weight sum)
+    tie_weight_by_pocket = {
+        k: sum(G[F][j].get("weight", 1.0) for j in clusters[k] if G.has_edge(F, j))
+        for k in range(len(clusters))
+    }
+    home_idx = max(tie_weight_by_pocket, key=lambda k: tie_weight_by_pocket[k])
+    q_base = ego.embeddings["F"]  # start with your own content vector as "message"
+    alpha = 0.2  # gentle translation toward a pocket
+
+    # 6) Orientation scores (mild exploration)
+    scores = orientation_scores(
+        ego=ego,
+        clusters=clusters,
+        target_pocket_by_node=pocket_by_node,
+        q_base=q_base,
+        home_pocket_idx=home_idx,
+        alpha=alpha,
+        instabilities={"B": 0.05},  # if you have any flakiness prior, inject here
+        weights=OrientationWeights(lam1=1.0, lam2=0.8, lam3=0.7, lam4=1.2, lam5=0.5),
+        ridge_lam=1e-3
+    )
+
+    # Pretty-print a compact summary
+    print("Neighbors:", [format_node(j) for j in neighbors])
+    print("\nOverlaps (1 - overlap favors exploration):")
+    for j in neighbors:
+        print(f"  {format_node(j)}: {overlaps[j]:.2f}  -> (1-overlap)={1-overlaps[j]:.2f}")
+    print("\nClusters:", [[format_node(n) for n in sorted(list(C))] for C in clusters])
+    print(f"Attention entropy H_F (bits): {H:.3f}")
+    print(f"\nPublic legibility R^2_in (all neighbors): {r2_in_all:.3f}")
+    print("Per-cluster R^2_in:", {tuple([format_node(n) for n in sorted(list(clusters[k]))]): round(v,3) for k,v in r2_in_per_cluster.items()})
+    print("\nSubjective attunement R^2_out per cluster:", {tuple([format_node(n) for n in sorted(list(clusters[k]))]): round(v,3) for k,v in r2_out.items()})
+    print("\nHeat-residual novelty s_F(t) per pocket:", {tuple([format_node(n) for n in sorted(list(clusters[k]))]): round(v,3) for k,v in s_t.items()})
+    print("\nPer-neighbor readability R^2_in(j):", {format_node(j): round(r2_in_per_neighbor[j],3) for j in neighbors})
+    print("\nOrientation scores (higher is better):", {format_node(j): round(scores[j],3) for j in neighbors})
+    best = max(scores, key=scores.__getitem__)
+    print(f"\nBest next approach: {format_node(best)}")
