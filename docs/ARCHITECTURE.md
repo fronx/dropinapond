@@ -1,8 +1,8 @@
 # Architecture
 
-## The Epistemic Ego Graph
+## The Epistemic Ego Graph: Continuous Semantic Fields
 
-Each person maintains a JSON file representing their **epistemic ego network** - their own state (ground truth) plus their **predictive models** of immediate neighbors:
+Each person maintains a JSON file representing their **epistemic ego network** - their own semantic field (ground truth) plus their **predictive models** of immediate neighbors' semantic fields:
 
 ```json
 {
@@ -11,21 +11,46 @@ Each person maintains a JSON file representing their **epistemic ego network** -
     {
       "id": "F",
       "name": "Fronx",
-      "embedding": [0.8, 0.2, -0.1, 0.3, 0.5],  // Ground truth (your actual state)
-      "keyphrases": {
-        "audio embeddings": 1.0,
-        "semantic search": 0.9,
-        "navigation interfaces": 0.7
+      "phrases": [
+        {
+          "text": "audio embeddings",
+          "embedding": [0.82, 0.31, -0.15, 0.41, 0.52],
+          "weight": 1.0
+        },
+        {
+          "text": "semantic search",
+          "embedding": [0.78, 0.25, -0.09, 0.38, 0.49],
+          "weight": 0.9
+        },
+        {
+          "text": "navigation interfaces",
+          "embedding": [0.71, 0.33, -0.11, 0.29, 0.44],
+          "weight": 0.7
+        }
+      ],
+      "embedding": {
+        "mean": [0.77, 0.30, -0.12, 0.36, 0.48],  // Optional summary
+        "covariance": null                         // Optional, for uncertainty
       },
       "is_self": true
     },
     {
       "id": "B",
       "name": "Blake",
-      "embedding": [0.4, 0.6, 0.1, -0.2, 0.3],  // Predicted (your best guess)
-      "keyphrases": {
-        "music cognition": 1.0,
-        "pattern recognition": 0.8
+      "phrases": [
+        {
+          "text": "music cognition",
+          "embedding": [0.41, 0.61, 0.08, -0.19, 0.35],
+          "weight": 1.0
+        },
+        {
+          "text": "pattern recognition",
+          "embedding": [0.38, 0.58, 0.13, -0.21, 0.31],
+          "weight": 0.8
+        }
+      ],
+      "embedding": {
+        "mean": [0.40, 0.60, 0.10, -0.20, 0.33]
       },
       "is_self": false,
       "prediction_confidence": 0.6,
@@ -45,17 +70,38 @@ Each person maintains a JSON file representing their **epistemic ego network** -
 
 ### Key Components
 
-**Nodes**: Your position (ground truth) and your models of others (predictions)
+**Nodes**: Continuous semantic fields (not discrete vectors)
 - `id`: Unique identifier
 - `name`: Human-readable name
-- `embedding`: Semantic vector (typically 5-100 dimensions)
-  - If `is_self=true`: Ground truth (your actual position)
-  - If `is_self=false`: Predicted (your best guess of their position)
-- `keyphrases`: Weighted terms capturing interests/expertise
+- `phrases`: Array of phrase-level embeddings (the **primary representation**)
+  - `text`: The phrase itself
+  - `embedding`: Semantic vector for this specific phrase
+  - `weight`: Importance/salience (0-1)
+- `embedding.mean`: Optional pre-computed summary (convenience, not ground truth)
+- `embedding.covariance`: Optional uncertainty estimate
+- `is_self`: Ground truth (true) or prediction (false)
 - `prediction_confidence`: (0-1) How certain you are about this prediction (only for neighbors)
 - `last_updated`: When you last refined this prediction (only for neighbors)
 
-**Critical insight**: This is an **epistemic graph**, not an objective one. Blake also maintains their own ego graph with their ground truth and their prediction of you. Your prediction of Blake may differ from Blake's ground truth. This asymmetry is fundamental to the privacy model.
+**Critical insight**: This is an **epistemic graph** of **continuous semantic fields**, not discrete position vectors. Blake also maintains their own ego graph with their ground truth field and their prediction of your field. Your prediction of Blake's field may differ from Blake's ground truth field. This asymmetry is fundamental to the privacy model.
+
+### Why Continuous Fields?
+
+**Previous approach**: Compute a single embedding per person (weighted average of phrases), then cluster into discrete "pockets."
+
+**Problems**:
+- **Premature hardening**: Clustering creates artificial boundaries between facets that might converge or synergize
+- **Feedback loops**: Discrete clusters amplify their own boundaries over time
+- **Loss of nuance**: A person's semantic field is richer than a single point or cluster label
+
+**New approach**: Keep all phrase-level embeddings, operate on **continuous kernel-weighted neighborhoods** instead of discrete clusters.
+
+**Benefits**:
+- Preserves semantic continuity and expressiveness
+- Structure emerges from ad-hoc analysis, not baked into stored data
+- Aligns with cognitive metaphor: navigating a **smooth meaning landscape**, not hopping between islands
+- Supports emergent detection of themes and bridges
+- Maintains Markov blanket principle (local inference, no global categorization)
 
 **Edges**: Two types of relationships
 - `actual`: Real interaction strength across time
@@ -66,65 +112,99 @@ Each person maintains a JSON file representing their **epistemic ego network** -
 
 The gap between `potential` and `actual` reveals **latent opportunities** - connections that would be mutually intelligible but haven't been actualized.
 
-## The Six Navigation Metrics
+## The Six Navigation Metrics (Continuous Field Version)
 
-The system computes multiple signals and combines them into **orientation scores** that guide your next interactions.
+The system computes multiple signals and combines them into **orientation scores** that guide your next interactions. All metrics operate on **continuous semantic fields** using kernel-weighted neighborhoods.
 
-### 1. Ego Picture: Cluster Detection
+### 1. Semantic Landscape Picture: Kernel-Based Neighborhoods
 
-**Goal**: Identify communities in your network
+**Goal**: Understand the topology of your semantic field and attention distribution
 
-**Method**: Spectral clustering on the embedding similarity graph
+**Method**: Compute soft neighborhood weights using Gaussian kernels
 
 ```python
-# Build similarity matrix from embeddings
-S[i,j] = cosine_similarity(embedding_i, embedding_j)
+# For each pair of phrase embeddings, compute kernel similarity
+K[i,j] = exp(-||phrase_i.embedding - phrase_j.embedding||^2 / (2 * sigma^2))
 
-# Apply threshold to get adjacency matrix
-A[i,j] = 1 if S[i,j] > threshold else 0
+# This gives us soft "closeness" rather than discrete cluster membership
+# sigma controls the kernel bandwidth (typical: sigma = 0.5 to 2.0)
 
-# Detect clusters using graph Laplacian eigenvectors
-clusters = spectral_clustering(A, n_clusters=3)
+# Aggregate kernel weights to person level
+K_person[i,j] = sum over phrases (
+    K[phrase_i_k, phrase_j_l] * weight_i_k * weight_j_l
+)
 
-# For each cluster, compute:
-overlap[c] = |neighbors_in_c| / |all_neighbors|
-attention[c] = sum(interaction_weights_in_c) / total_interaction
+# Compute local density for each person (how "central" are they?)
+density[i] = sum_j(K_person[i,j] * interaction_strength[i,j])
+
+# Attention distribution (where you actually spend time)
+attention[i] = interaction_strength[i] / sum_all(interaction_strength)
 attention_entropy = -sum(p * log(p)) for p in attention_distribution
 ```
 
 **Output**:
-- Cluster assignments for each neighbor
-- Overlap scores (how much of your network is in each cluster)
-- Attention distribution (where you actually spend time)
+- Kernel similarity matrix (continuous neighborhood structure)
+- Local density per neighbor (centrality in the semantic landscape)
+- Attention distribution (where you spend time)
 - Shannon entropy of attention (how focused vs. distributed)
 
 **Interpretation**:
-- High entropy = You spread attention across clusters (exploration)
-- Low entropy = You focus on one cluster (exploitation)
+- High density = Person is central to a semantic neighborhood (hub)
+- Low density = Person is on the periphery (novel, exploratory)
+- High entropy = You spread attention across the landscape (exploration)
+- Low entropy = You focus on one region (exploitation)
 
-### 2. Public Legibility (R²_in)
-
-**Goal**: "How well can this cluster reconstruct my embedding from their own positions?"
-
-**Method**: Ridge regression from cluster members to focal node
-
+**On-demand clustering**: If you need discrete "pockets" for visualization or analysis, compute them transiently:
 ```python
-# For each cluster C:
-X = np.array([emb for neighbor in C for emb in [embeddings[neighbor]]])
-y = embeddings[focal_node]
+# Option 1: Kernel density peaks
+pockets = find_local_maxima(density_field)
 
-model = Ridge(alpha=0.1).fit(X, y)
-R²_in[C] = model.score(X, y)
+# Option 2: Spectral clustering on kernel matrix
+pockets = spectral_clustering(K_person, n_clusters=k)
 ```
 
-**Output**: R² scores per cluster (0 to 1)
+**Critical**: These clusters are **computed on demand, never stored**. The underlying representation stays continuous.
+
+### 2. Public Legibility (R²_in): Kernel-Weighted Reconstruction
+
+**Goal**: "How well can my semantic neighborhood reconstruct my field from their own positions?"
+
+**Method**: Kernel-weighted ridge regression from neighbors to focal node
+
+```python
+# For each neighbor n, compute kernel weight based on semantic closeness
+K_weights[n] = K_person[focal_node, n]
+
+# Weighted regression: reconstruct your phrases from neighbors' phrases
+X = np.array([phrase_emb for neighbor in neighbors
+              for phrase_emb in neighbor.phrases])
+y = np.array([phrase_emb for phrase_emb in focal_node.phrases])
+
+# Weight each training sample by kernel similarity
+sample_weights = np.array([K_weights[neighbor] * phrase.weight
+                          for neighbor in neighbors
+                          for phrase in neighbor.phrases])
+
+model = Ridge(alpha=0.1).fit(X, y, sample_weight=sample_weights)
+R²_in = model.score(X, y, sample_weight=sample_weights)
+```
+
+**Output**: R² score (0 to 1) - how well your semantic field is legible to your neighborhood
 
 **Interpretation**:
-- High R²_in (>0.7) = You're predictable/understandable to this cluster
-- Low R²_in (<0.3) = You're mysterious to them, potential for surprise
+- High R²_in (>0.7) = You're predictable/understandable from your neighborhood
+- Low R²_in (<0.3) = You're mysterious, potential for surprise
 - Medium R²_in (0.3-0.7) = Partial alignment, room for nuance
 
-**Use case**: If you want to be understood, engage with high-R²_in clusters. If you want to surprise/challenge, engage with low-R²_in clusters.
+**Neighborhood-specific legibility** (optional): Compute R²_in for specific semantic regions:
+```python
+# Only use neighbors with high kernel weight in a specific semantic region
+region_neighbors = [n for n in neighbors if K_person[focal, n] > threshold
+                   and in_semantic_region(n, region_center)]
+R²_in[region] = compute_weighted_regression(focal, region_neighbors)
+```
+
+**Use case**: If you want to be understood, engage with high-kernel-weight neighbors where R²_in is high. If you want to surprise, engage where R²_in is low.
 
 ### 3. Subjective Attunement (R²_out)
 
@@ -202,37 +282,54 @@ residual[neighbor] = abs(actual_position - smoothed_position)
 - **Sparse solvers**: Use conjugate gradient if L is sparse
 - Target: O(n²) or better for practical use
 
-### 5. Translation Vectors
+### 5. Semantic Gradients: Local Field Translation
 
-**Goal**: How to shift your message toward a target cluster
+**Goal**: How to shift your message toward a target semantic region
 
-**Method**: Compute centroid difference and translate query embedding
+**Method**: Estimate local gradient of the embedding field rather than discrete centroid differences
 
 ```python
-# Compute cluster centroids
-centroid_A = mean(embeddings[n] for n in cluster_A)
-centroid_B = mean(embeddings[n] for n in cluster_B)
+# Given a target semantic region (defined by high-density neighbors)
+target_neighbors = [n for n in neighbors if density[n] > threshold
+                   and in_region(n, target_region)]
 
-# Translation = direction from A to B
-translation_vector = centroid_B - centroid_A
+# Compute weighted gradient: direction of steepest ascent toward target
+gradient = np.zeros_like(your_embedding)
+for neighbor in target_neighbors:
+    # Direction from you to neighbor
+    direction = neighbor.embedding - your_embedding
 
-# Shift your query
-query_for_B = your_query + alpha * translation_vector
+    # Weight by kernel similarity and density
+    weight = K_person[you, neighbor] * density[neighbor]
 
-# Compute post-translation similarities
-similarity[n] = cosine_similarity(query_for_B, embeddings[n])
+    gradient += weight * direction
+
+# Normalize
+gradient = gradient / np.linalg.norm(gradient)
+
+# Translate your query smoothly along gradient
+query_translated = your_query + alpha * gradient
+
+# Compute post-translation kernel similarities
+similarity[n] = exp(-||query_translated - n.embedding||^2 / (2 * sigma^2))
 ```
 
 **Output**:
-- Translation vectors between clusters
-- Post-translation similarity scores per neighbor
+- Semantic gradient vector (direction toward target region)
+- Post-translation kernel similarities per neighbor
+- Recommended step size (alpha) based on field curvature
 
 **Interpretation**:
-- Translation vectors encode "semantic shifts" between communities
+- Gradients encode **local semantic shifts** in a continuous field
 - High post-translation similarity = This neighbor is well-positioned to receive your shifted message
-- This is how the system suggests **how to frame** your message for different audiences
+- This is how the system suggests **how to frame** your message for different semantic regions
 
-**Use case**: "I want to talk about X with cluster B, but I'm currently in cluster A. How should I frame it?"
+**Advantages over discrete translation vectors**:
+- Smooth, continuous navigation (no discontinuities at cluster boundaries)
+- Respects local field topology (doesn't assume linear structure)
+- Works even when "clusters" are ambiguous or overlapping
+
+**Use case**: "I want to talk about X with people in semantic region B. How should I frame it?" The system computes the gradient from your current position toward region B and suggests phrase-level translations.
 
 ### 6. Orientation Score (Composite)
 

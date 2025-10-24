@@ -19,6 +19,13 @@
 
 ### What's Next
 
+**Structural changes** (breaking):
+- [ ] **Continuous semantic fields**: Refactor data schema to store phrase-level embeddings (primary representation)
+- [ ] **Kernel-based neighborhoods**: Replace discrete clustering with Gaussian kernel similarities
+- [ ] **Gradient-based translation**: Replace centroid-difference translation vectors with local field gradients
+- [ ] **On-demand clustering**: Compute "pockets" transiently for visualization, never store
+
+**New features**:
 - [ ] Conversational interface (Claude-based ego graph builder)
 - [ ] Embedding computation pipeline (sentence transformers integration)
 - [ ] **Temporal dynamics**: Edge decay, momentum in ties, trajectory prediction
@@ -27,7 +34,7 @@
 - [ ] **Prediction-error exchange protocol**: Cross-node handshake exchanging epistemic updates
 - [ ] **Projected mutual predictability**: Refine potential edges beyond cosine similarity
 - [ ] Confidence tracking for predicted embeddings
-- [ ] Multi-hop navigation (bridges to distant clusters)
+- [ ] Multi-hop navigation (bridges to distant regions)
 - [ ] Web UI (optional, for visualization)
 
 ## Running the Example
@@ -97,45 +104,100 @@ L: 0.12 (Lara is well-connected)
 
 ## Code Structure
 
-### Core Module: [src/ego_ops.py](../src/ego_ops.py)
+### Core Module: [src/ego_ops.py](../src/ego_ops.py) - NEEDS REFACTORING
 
-**Main components**:
+**Current implementation** (v0.1): Uses discrete clustering and single-vector-per-person representation.
+
+**Target implementation** (v0.2): Will use continuous semantic fields with phrase-level embeddings.
+
+**Main components** (current):
 
 1. **Data structures** (lines 1-50):
    - `EgoData`: Dataclass holding the ego graph
    - JSON loading utilities
+   - **TO REFACTOR**: Add support for phrase-level embeddings
 
 2. **Utility functions** (lines 51-150):
    - `cosine_similarity()`: Compute cosine between vectors
    - `normalize()`: L2 normalization
    - `r_squared()`: R² metric for regression quality
+   - **TO ADD**: `gaussian_kernel()`: K[i,j] = exp(-||x_i - x_j||² / 2σ²)
 
-3. **Ego picture** (lines 151-250):
-   - `compute_ego_picture()`: Cluster detection + overlap/attention metrics
-   - Uses NetworkX spectral clustering
+3. **Semantic landscape picture** (lines 151-250):
+   - **CURRENT**: `compute_ego_picture()`: Cluster detection + overlap/attention metrics
+   - **TO REFACTOR**: `compute_landscape_picture()`: Kernel similarities + density + attention
+   - Replace spectral clustering with on-demand density peak detection
 
 4. **Public legibility** (lines 251-320):
-   - `compute_public_legibility()`: How well neighbors reconstruct focal node
-   - Ridge regression with alpha=0.1
+   - **CURRENT**: Ridge regression on cluster members
+   - **TO REFACTOR**: Kernel-weighted ridge regression on continuous field
 
 5. **Subjective attunement** (lines 321-450):
-   - `compute_subjective_attunement()`: How well focal node reconstructs neighbors
-   - Includes gated rank-2 variant (lines 440-449)
+   - **CURRENT**: Reconstruct neighbors from focal node
+   - **TO REFACTOR**: Kernel-weighted reconstruction with legibility threshold check
+   - Keep gated rank-2 variant (lines 440-449)
 
 6. **Heat-residual novelty** (lines 451-550):
-   - `compute_heat_residual_novelty()`: Diffusion-based topological distance
-   - Solves (I + t*L)^-1 for heat kernel
+   - **CURRENT**: Diffusion on discrete clusters
+   - **TO REFACTOR**: Continuous diffusion with kernel-weighted Laplacian
+   - Optimize with sparse solvers for scalability
 
-7. **Translation vectors** (lines 551-620):
-   - `compute_translation_vectors()`: Semantic shifts between clusters
-   - Centroid differences + query translation
+7. **Semantic gradients** (lines 551-620):
+   - **CURRENT**: `compute_translation_vectors()`: Centroid differences
+   - **TO REFACTOR**: `compute_semantic_gradients()`: Local field gradients
+   - Weighted by kernel similarity and density
 
 8. **Orientation scores** (lines 621-680):
-   - `compute_orientation_scores()`: Composite navigation metric
-   - Configurable weights for different signals
+   - **CURRENT**: Composite score using cluster-based metrics
+   - **TO REFACTOR**: Update to use kernel-based metrics (should be mostly compatible)
 
 9. **Command-line runner** (lines 681-end):
-   - Loads fixture, runs all metrics, prints results
+   - Keep mostly unchanged, update output format
+
+### On-Demand Clustering Utilities (NEW)
+
+```python
+# src/clustering_utils.py (to be created)
+
+def compute_on_demand_clusters(kernel_matrix, method='density_peaks', k=None):
+    """
+    Compute clusters transiently from kernel matrix for visualization/analysis.
+    Never store the cluster assignments - recompute as needed.
+
+    Args:
+        kernel_matrix: K[i,j] = exp(-||x_i - x_j||² / 2σ²)
+        method: 'density_peaks' or 'spectral'
+        k: number of clusters (if None, auto-detect)
+
+    Returns:
+        cluster_assignments: temporary mapping of nodes to cluster IDs
+    """
+    if method == 'density_peaks':
+        density = kernel_matrix.sum(axis=1)
+        peaks = find_local_maxima(density)
+        assignments = assign_to_nearest_peak(kernel_matrix, peaks)
+    elif method == 'spectral':
+        assignments = spectral_clustering(kernel_matrix, n_clusters=k)
+
+    return assignments  # Use immediately, don't store
+
+def visualize_semantic_landscape(ego_data, kernel_matrix):
+    """
+    Create smooth 2D visualization using UMAP or t-SNE on phrase embeddings.
+    Show density heatmap with kernel weights, not discrete cluster colors.
+    """
+    # Reduce dimensionality
+    embeddings_2d = umap.UMAP().fit_transform(all_phrase_embeddings)
+
+    # Compute density field
+    density = compute_kernel_density(embeddings_2d, kernel_matrix)
+
+    # Plot as continuous heatmap
+    plt.imshow(density, cmap='viridis', interpolation='bilinear')
+    plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], alpha=0.5)
+
+    return fig
+```
 
 ### Translation Hints: [src/translation_hints.py](../src/translation_hints.py)
 

@@ -45,13 +45,22 @@ It's **distributed and privacy-preserving**: each person runs local computations
 - Building the conversational interface
 
 ### 5. [Refinements Document](REFINEMENTS.md)
-**Key conceptual clarifications**
+**Key conceptual clarifications (post-initial review)**
 
 - Epistemic ego graphs vs. objective graphs
 - Projected mutual predictability (not just cosine similarity)
 - Nuanced attunement interpretation
 - Prediction-error exchange protocol
 - Terminology shifts and alignment improvements
+
+### 6. [Continuous Semantic Fields](CONTINUOUS_FIELDS.md)
+**Architectural shift from discrete clustering to continuous fields**
+
+- Why continuous fields vs. discrete clusters
+- Data structure changes (phrase-level embeddings)
+- Metric adaptations (kernel-based neighborhoods)
+- On-demand clustering (compute transiently, never store)
+- Implementation roadmap and migration path
 
 ## Quick Start
 

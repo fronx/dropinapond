@@ -74,19 +74,19 @@ Your ego graph lives locally. When you interact with someone else who also uses 
 
 **Query**: "I want to explore applications of diffusion models to biology. Who in my network can bridge me there?"
 
-**System**: Identifies people at intersection of ML and bio clusters, suggests framings that resonate with each.
+**System**: Identifies people in the semantic region between ML and bio, computes gradient toward that region, suggests framings that resonate with the local field topology.
 
 ### 2. Career Transitions
 
 **Query**: "I'm moving from software engineering to climate tech. Who should I talk to?"
 
-**System**: Finds bridges between clusters, ranks by novelty and alignment, suggests conversation starters.
+**System**: Computes semantic gradient from your current position toward the climate tech region, identifies people along that gradient path, ranks by novelty and alignment, suggests conversation starters that follow the gradient.
 
 ### 3. Community Building
 
 **Query**: "I want to connect two groups I'm involved with. Who are the natural bridges?"
 
-**System**: Identifies people with high betweenness and semantic overlap between clusters.
+**System**: Identifies people who occupy intermediate positions in the semantic landscape between the two groups, with high kernel similarity to both regions.
 
 ### 4. Learning Optimization
 
@@ -96,13 +96,25 @@ Your ego graph lives locally. When you interact with someone else who also uses 
 
 ## Why "Drop in a Pond"?
 
-When you interact with someone, the effect **ripples outward** through the network. The system helps you:
+When you interact with someone, the effect **ripples outward** through the semantic landscape. The system helps you:
 
 - Choose where to drop your stone (who to engage)
-- Predict how the ripples will spread (diffusion through clusters)
+- Predict how the ripples will spread (diffusion through the continuous field)
 - Optimize for desired outcomes (reach, novelty, alignment)
 
-You navigate by making **local perturbations** (individual conversations) that have **global effects** (shifting your position in the network).
+You navigate by making **local perturbations** (individual conversations) that have **global effects** (shifting your position in the landscape).
+
+### The Smooth Landscape Metaphor
+
+Think of your network as a **continuous meaning landscape**, not a collection of discrete islands:
+
+- Each person occupies a **region** in this landscape (not just a single point)
+- Semantic similarity creates **valleys** and **ridges** in the topology
+- You navigate by following **gradients** toward areas of interest
+- Interactions create **pathways** that make certain regions more accessible
+- There are no hard boundaries - themes and communities blend and overlap naturally
+
+This continuous view keeps the system fluid and prevents premature categorization from hardening into rigid boundaries.
 
 ## Why Claude as Interface?
 
