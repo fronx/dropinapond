@@ -592,42 +592,177 @@ def orientation_scores(
     """
     Compute per-neighbor Score(j) using only ego info.
     target_pocket_by_node: mapping node -> cluster index it belongs to.
+
+    NOTE: This function now delegates to orientation_score_breakdowns() to ensure
+    the scores and their explanations are always computed using the same logic.
+    """
+    breakdowns = orientation_score_breakdowns(
+        ego=ego,
+        clusters=clusters,
+        target_pocket_by_node=target_pocket_by_node,
+        q_base=q_base,
+        home_pocket_idx=home_pocket_idx,
+        alpha=alpha,
+        instabilities=instabilities,
+        weights=weights,
+        ridge_lam=ridge_lam
+    )
+    # Extract just the total scores
+    return {node_id: breakdown["total_score"] for node_id, breakdown in breakdowns.items()}
+
+def orientation_score_breakdowns(
+    ego: EgoData,
+    clusters: List[set],
+    target_pocket_by_node: Dict[str, int],
+    q_base: np.ndarray,
+    home_pocket_idx: int,
+    alpha: float = 0.2,
+    instabilities: Optional[Dict[str, float]] = None,
+    weights: OrientationWeights = OrientationWeights(),
+    ridge_lam: float = 1e-3
+) -> Dict[str, Dict]:
+    """
+    Compute detailed breakdowns of orientation scores showing each component's contribution.
+    Returns a dict mapping each neighbor to a breakdown dict with:
+      - total_score: final orientation score
+      - weights: the lambda weights used
+      - components: dict with each of the 5 components showing:
+          - raw_value: the metric value before weighting
+          - weighted_contribution: the value after applying lambda weight
+          - metadata: additional context about how it was computed
     """
     G = ego.graph()
     F = ego.focal
-    # Precompute pieces
-    # 1 - overlap
-    one_minus_overlap = {
-        j: 1.0 - jaccard_overlap(G, F, j)
-        for j in G.neighbors(F)
-    }
-    # R^2_in per neighbor (single-neighbor reconstruction)
+
+    # Precompute all intermediate values (same as orientation_scores)
+    overlaps = {j: jaccard_overlap(G, F, j) for j in G.neighbors(F)}
+    one_minus_overlap = {j: 1.0 - ov for j, ov in overlaps.items()}
+
     r2_in_per_neighbor = public_legibility_r2_per_neighbor(ego, lam=ridge_lam)
-    # R^2_out for each pocket
+
     r2_out_by_pocket = {
         k: subjective_attunement_r2(ego, clusters[k], lam=ridge_lam)
         for k in range(len(clusters))
     }
-    # Translation vectors and translated query per pocket
+
     mu_home = pocket_centroid(ego, clusters[home_pocket_idx])
     t_by_pocket = {k: pocket_centroid(ego, clusters[k]) - mu_home for k in range(len(clusters))}
     qk_by_pocket = {k: translate_query(q_base, t_by_pocket[k], alpha=alpha) for k in t_by_pocket}
-    # Instability defaults
+
     inst = instabilities or {}
-    # Scores
-    out: Dict[str, float] = {}
+
+    # Build cluster names for display
+    cluster_names = {}
+    for k, cluster in enumerate(clusters):
+        if ego.names:
+            member_names = [str(ego.names.get(node_id, node_id)) for node_id in sorted(cluster)]
+        else:
+            member_names = [str(node_id) for node_id in sorted(cluster)]
+        cluster_names[k] = ", ".join(member_names)
+
+    # Compute breakdowns for each neighbor
+    breakdowns: Dict[str, Dict] = {}
     for j in G.neighbors(F):
         k = target_pocket_by_node.get(j, None)
-        cos_term = _cos(qk_by_pocket[k], ego.embeddings[j]) if k is not None else 0.0
-        score = (
-            weights.lam1 * one_minus_overlap[j]
-            + weights.lam2 * r2_in_per_neighbor.get(j, 0.0)
-            + weights.lam3 * (r2_out_by_pocket.get(k, 0.0) if k is not None else 0.0)
-            + weights.lam4 * cos_term
-            - weights.lam5 * inst.get(j, 0.0)
-        )
-        out[j] = float(score)
-    return out
+
+        # Component 1: Network exploration (1 - overlap)
+        exploration_raw = one_minus_overlap[j]
+        exploration_contrib = weights.lam1 * exploration_raw
+
+        # Component 2: Readability (R²_in - they get you)
+        readability_raw = r2_in_per_neighbor.get(j, 0.0)
+        readability_contrib = weights.lam2 * readability_raw
+
+        # Component 3: Subjective attunement (R²_out - you get their cluster)
+        if k is not None:
+            attunement_raw = r2_out_by_pocket.get(k, 0.0)
+            attunement_contrib = weights.lam3 * attunement_raw
+            target_cluster_name = cluster_names.get(k, f"Cluster {k}")
+        else:
+            attunement_raw = 0.0
+            attunement_contrib = 0.0
+            target_cluster_name = None
+
+        # Component 4: Topical relevance (cosine after translation)
+        if k is not None:
+            cos_term = _cos(qk_by_pocket[k], ego.embeddings[j])
+            relevance_raw = cos_term
+            relevance_contrib = weights.lam4 * cos_term
+            translation_magnitude = float(np.linalg.norm(t_by_pocket[k]))
+        else:
+            relevance_raw = 0.0
+            relevance_contrib = 0.0
+            translation_magnitude = 0.0
+
+        # Component 5: Instability penalty
+        instability_raw = inst.get(j, 0.0)
+        instability_contrib = -weights.lam5 * instability_raw
+
+        # Total score
+        total = (exploration_contrib + readability_contrib + attunement_contrib +
+                relevance_contrib + instability_contrib)
+
+        breakdowns[j] = {
+            "total_score": float(total),
+            "weights": {
+                "lambda1_exploration": weights.lam1,
+                "lambda2_readability": weights.lam2,
+                "lambda3_attunement": weights.lam3,
+                "lambda4_relevance": weights.lam4,
+                "lambda5_instability": weights.lam5,
+            },
+            "components": {
+                "exploration": {
+                    "raw_value": float(exploration_raw),
+                    "weighted_contribution": float(exploration_contrib),
+                    "metadata": {
+                        "overlap": float(overlaps[j]),
+                        "one_minus_overlap": float(exploration_raw),
+                        "description": "Network exploration benefit (low overlap = high novelty)"
+                    }
+                },
+                "readability": {
+                    "raw_value": float(readability_raw),
+                    "weighted_contribution": float(readability_contrib),
+                    "metadata": {
+                        "r2_in": float(readability_raw),
+                        "description": "How well they can predict your interests (public legibility)"
+                    }
+                },
+                "attunement": {
+                    "raw_value": float(attunement_raw),
+                    "weighted_contribution": float(attunement_contrib),
+                    "metadata": {
+                        "r2_out": float(attunement_raw),
+                        "target_cluster_name": target_cluster_name,
+                        "target_cluster_index": k,
+                        "description": "How well you understand their cluster's interests"
+                    }
+                },
+                "relevance": {
+                    "raw_value": float(relevance_raw),
+                    "weighted_contribution": float(relevance_contrib),
+                    "metadata": {
+                        "cosine_after_translation": float(relevance_raw),
+                        "home_cluster_name": cluster_names.get(home_pocket_idx, f"Cluster {home_pocket_idx}"),
+                        "home_cluster_index": home_pocket_idx,
+                        "target_cluster_name": target_cluster_name,
+                        "translation_vector_magnitude": float(translation_magnitude),
+                        "description": "Semantic alignment after translating from your cluster to theirs"
+                    }
+                },
+                "instability": {
+                    "raw_value": float(instability_raw),
+                    "weighted_contribution": float(instability_contrib),
+                    "metadata": {
+                        "instability_score": float(instability_raw),
+                        "description": "Penalty for relationship instability (negative = stable)"
+                    }
+                }
+            }
+        }
+
+    return breakdowns
 
 def cluster_residual_direction(ego: EgoData, cluster, lam: float = 1e-3):
     F = ego.focal
@@ -719,6 +854,7 @@ def save_analysis_json(
     r2_in_per_neighbor: Dict[str, float],
     scores: Dict[str, float],
     phrase_similarities: Optional[Dict[str, List[Dict]]] = None,
+    orientation_score_breakdowns: Optional[Dict[str, Dict]] = None,
     output_dir: Optional[Path] = None,
     ego_data: Optional['EgoData'] = None
 ) -> Path:
@@ -788,6 +924,7 @@ def save_analysis_json(
             "heat_residual_novelty": cluster_dict_to_serializable(s_t),
             "per_neighbor_readability": r2_in_per_neighbor,
             "orientation_scores": scores,
+            "orientation_score_breakdowns": orientation_score_breakdowns or {},
             "phrase_similarities": phrase_similarities or {}
         },
         "recommendations": recommendations
@@ -872,7 +1009,8 @@ if __name__ == "__main__":
     alpha = 0.2  # gentle translation toward a pocket
 
     # 6) Orientation scores (mild exploration)
-    scores = orientation_scores(
+    # Compute both scores and their detailed breakdowns
+    score_breakdowns = orientation_score_breakdowns(
         ego=ego,
         clusters=clusters,
         target_pocket_by_node=pocket_by_node,
@@ -883,6 +1021,8 @@ if __name__ == "__main__":
         weights=OrientationWeights(lam1=1.0, lam2=0.8, lam3=0.7, lam4=1.2, lam5=0.5),
         ridge_lam=1e-3
     )
+    # Extract just the scores for backward compatibility
+    scores = {node_id: breakdown["total_score"] for node_id, breakdown in score_breakdowns.items()}
 
     # Pretty-print a compact summary
     print("Neighbors:", [format_node(j) for j in neighbors])
@@ -928,6 +1068,7 @@ if __name__ == "__main__":
         r2_in_per_neighbor=r2_in_per_neighbor,
         scores=scores,
         phrase_similarities=phrase_similarities,
+        orientation_score_breakdowns=score_breakdowns,
         ego_data=ego
     )
     print(f"\nAnalysis saved to: {analysis_path}")

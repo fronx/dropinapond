@@ -31,6 +31,7 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
     readability: analysisData?.metrics?.per_neighbor_readability?.[person.id],
     overlap: analysisData?.metrics?.overlaps?.[person.id],
     orientationScore: analysisData?.metrics?.orientation_scores?.[person.id],
+    orientationBreakdown: analysisData?.metrics?.orientation_score_breakdowns?.[person.id],
   };
 
   // Find which cluster this person belongs to
@@ -423,22 +424,101 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
                 {getMetricLabel('orientation_score', metrics.orientationScore).description}
               </div>
 
-              <div style={subSectionTitleStyle}>What went into this:</div>
-              <div style={{ fontSize: '0.8125rem', marginBottom: '8px' }}>
-                Composite metric combining:
-              </div>
-              <ul style={{
-                fontSize: '0.8125rem',
-                paddingLeft: '20px',
-                marginBottom: '12px',
-                lineHeight: '1.6',
-              }}>
-                <li><strong>Network exploration</strong>: {metrics.overlap !== undefined ? `1 - ${metrics.overlap.toFixed(2)} = ${(1 - metrics.overlap).toFixed(2)}` : 'N/A'}</li>
-                <li><strong>They get you</strong>: R²_in = {metrics.readability !== undefined ? metrics.readability.toFixed(3) : 'N/A'}</li>
-                <li><strong>You get their cluster</strong>: R²_out = {clusterMetrics?.subjectiveAttunement?.toFixed(3) || 'N/A'}</li>
-                <li><strong>Semantic relevance</strong>: Cosine similarity after translation</li>
-                <li><strong>Stability</strong>: No instability penalty in this data</li>
-              </ul>
+              {metrics.orientationBreakdown ? (
+                <>
+                  <div style={subSectionTitleStyle}>Component Breakdown:</div>
+                  <div style={{ fontSize: '0.8125rem', marginBottom: '12px' }}>
+                    Total Score: <strong>{metrics.orientationBreakdown.total_score.toFixed(3)}</strong>
+                  </div>
+
+                  {/* Component details with actual values from backend */}
+                  <div style={codeBlockStyle}>
+                    {Object.entries(metrics.orientationBreakdown.components).map(([componentName, component]) => {
+                      const isNegative = component.weighted_contribution < 0;
+                      const weight = metrics.orientationBreakdown.weights[`lambda${
+                        componentName === 'exploration' ? '1' :
+                        componentName === 'readability' ? '2' :
+                        componentName === 'attunement' ? '3' :
+                        componentName === 'relevance' ? '4' : '5'
+                      }_${componentName}`];
+
+                      return (
+                        <div key={componentName} style={{
+                          marginBottom: '12px',
+                          paddingBottom: '12px',
+                          borderBottom: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`
+                        }}>
+                          <div style={{
+                            fontWeight: '600',
+                            color: isDarkMode ? '#93c5fd' : '#1e40af',
+                            marginBottom: '4px',
+                            textTransform: 'capitalize'
+                          }}>
+                            {componentName}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
+                            <div style={{ marginBottom: '2px' }}>
+                              Raw value: <strong>{component.raw_value.toFixed(3)}</strong>
+                            </div>
+                            <div style={{ marginBottom: '2px' }}>
+                              Weight (λ): <strong>{weight.toFixed(1)}</strong>
+                            </div>
+                            <div style={{ marginBottom: '4px' }}>
+                              Contribution: <strong style={{
+                                color: isNegative
+                                  ? (isDarkMode ? '#fca5a5' : '#dc2626')
+                                  : (isDarkMode ? '#86efac' : '#16a34a')
+                              }}>
+                                {isNegative ? '' : '+'}{component.weighted_contribution.toFixed(3)}
+                              </strong>
+                            </div>
+                            {component.metadata && (
+                              <div style={{
+                                fontSize: '0.7rem',
+                                color: isDarkMode ? '#9ca3af' : '#6b7280',
+                                fontStyle: 'italic'
+                              }}>
+                                {component.metadata.description}
+                                {component.metadata.target_cluster_name && (
+                                  <div style={{ marginTop: '2px' }}>
+                                    Target cluster: {component.metadata.target_cluster_name}
+                                  </div>
+                                )}
+                                {component.metadata.translation_vector_magnitude !== undefined &&
+                                 component.metadata.translation_vector_magnitude > 0 && (
+                                  <div style={{ marginTop: '2px' }}>
+                                    Translation distance: {component.metadata.translation_vector_magnitude.toFixed(3)}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                // Fallback if breakdown not available
+                <>
+                  <div style={subSectionTitleStyle}>What went into this:</div>
+                  <div style={{ fontSize: '0.8125rem', marginBottom: '8px' }}>
+                    Composite metric combining:
+                  </div>
+                  <ul style={{
+                    fontSize: '0.8125rem',
+                    paddingLeft: '20px',
+                    marginBottom: '12px',
+                    lineHeight: '1.6',
+                  }}>
+                    <li><strong>Network exploration</strong>: {metrics.overlap !== undefined ? `1 - ${metrics.overlap.toFixed(2)} = ${(1 - metrics.overlap).toFixed(2)}` : 'N/A'}</li>
+                    <li><strong>They get you</strong>: R²_in = {metrics.readability !== undefined ? metrics.readability.toFixed(3) : 'N/A'}</li>
+                    <li><strong>You get their cluster</strong>: R²_out = {clusterMetrics?.subjectiveAttunement?.toFixed(3) || 'N/A'}</li>
+                    <li><strong>Semantic relevance</strong>: Cosine similarity after translation</li>
+                    <li><strong>Stability</strong>: No instability penalty in this data</li>
+                  </ul>
+                </>
+              )}
 
               {edgeToFocal && (
                 <>
@@ -456,7 +536,7 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
                 Formula: λ₁·(1-overlap) + λ₂·R²_in + λ₃·R²_out + λ₄·cos(q_k, z_j) - λ₅·instability
               </div>
               <div style={explanationStyle}>
-                (see [ego_ops.py:429-478](src/ego_ops.py#L429-L478))
+                (see [ego_ops.py:632-781](src/ego_ops.py#L632-L781))
               </div>
             </div>
           )}
