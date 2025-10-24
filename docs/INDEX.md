@@ -112,6 +112,18 @@ This analyzes the example ego graph and outputs all navigation metrics.
 
 ## Project Status
 
-**Current**: Core metrics working, example fixture, command-line analysis
+**Current (v0.2)**:
+- All six navigation metrics with phrase-level embeddings
+- Modular directory format with ChromaDB integration
+- Conversational interface (`/ego-session` command)
+- Command-line analysis with JSON export
+- Visual interface (React + D3 force-directed graph)
+- Translation hints and phrase-level similarity explanations
+- Example graph (fronx) with 15 people across 6 clusters
 
-**Next**: Conversational interface, embedding pipeline, temporal dynamics, feedback loops
+**Planned (v0.3+)**:
+- Kernel-based neighborhoods (replace discrete clustering)
+- Gradient-based translation (replace centroid differences)
+- Temporal dynamics with exponential decay
+- Active inference loop (predict → interact → update)
+- Inter-node privacy-preserving protocol

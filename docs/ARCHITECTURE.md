@@ -2,150 +2,189 @@
 
 ## The Epistemic Ego Graph: Continuous Semantic Fields
 
-Each person maintains a JSON file representing their **epistemic ego network** - their own semantic field (ground truth) plus their **predictive models** of immediate neighbors' semantic fields:
+Each person maintains a modular directory structure representing their **epistemic ego network** - their own semantic field (ground truth) plus their **predictive models** of immediate neighbors' semantic fields.
 
+**Directory Structure (v0.2)**:
+```
+data/ego_graphs/fronx/
+├── metadata.json
+├── self.json
+├── connections/
+│   ├── blake.json
+│   └── ...
+├── edges.json
+└── contact_points.json
+```
+
+**self.json** (your ground truth semantic field):
 ```json
 {
-  "focal_node": "F",
-  "nodes": [
+  "id": "fronx",
+  "name": "Fronx",
+  "phrases": [
     {
-      "id": "F",
-      "name": "Fronx",
-      "phrases": [
-        {
-          "text": "audio embeddings",
-          "embedding": [0.82, 0.31, -0.15, 0.41, 0.52],
-          "weight": 1.0,
-          "last_updated": "2025-10-15"
-        },
-        {
-          "text": "semantic search",
-          "embedding": [0.78, 0.25, -0.09, 0.38, 0.49],
-          "weight": 0.9,
-          "last_updated": "2025-10-12"
-        },
-        {
-          "text": "navigation interfaces",
-          "embedding": [0.71, 0.33, -0.11, 0.29, 0.44],
-          "weight": 0.7,
-          "last_updated": "2025-09-28"
-        }
-      ],
-      "embedding": {
-        "mean": [0.77, 0.30, -0.12, 0.36, 0.48],  // Optional summary
-        "covariance": null                         // Optional, for uncertainty
-      },
-      "is_self": true
+      "text": "audio embeddings",
+      "weight": 1.0,
+      "last_updated": "2025-10-15"
     },
     {
-      "id": "B",
-      "name": "Blake",
-      "phrases": [
-        {
-          "text": "music cognition",
-          "embedding": [0.41, 0.61, 0.08, -0.19, 0.35],
-          "weight": 1.0
-        },
-        {
-          "text": "pattern recognition",
-          "embedding": [0.38, 0.58, 0.13, -0.21, 0.31],
-          "weight": 0.8
-        }
-      ],
-      "embedding": {
-        "mean": [0.40, 0.60, 0.10, -0.20, 0.33]
-      },
-      "is_self": false,
-      "prediction_confidence": 0.6,
-      "last_updated": "2025-03-15"
-    }
-  ],
-  "edges": [
+      "text": "semantic search",
+      "weight": 0.9,
+      "last_updated": "2025-10-12"
+    },
     {
-      "source": "F",
-      "target": "B",
-      "actual": {"present": 0.3},
-      "potential": 0.65
+      "text": "navigation interfaces",
+      "weight": 0.7,
+      "last_updated": "2025-09-28"
     }
   ]
 }
 ```
 
+**connections/blake.json** (your prediction of Blake's semantic field):
+```json
+{
+  "id": "blake",
+  "name": "Blake",
+  "phrases": [
+    {
+      "text": "music cognition",
+      "weight": 1.0,
+      "last_updated": "2025-03-15"
+    },
+    {
+      "text": "pattern recognition",
+      "weight": 0.8,
+      "last_updated": "2025-03-15"
+    }
+  ],
+  "capabilities": ["audio ML", "pattern recognition"],
+  "availability": [
+    {"date": "2025-10-24", "score": 0.7, "content": "Generally available"}
+  ],
+  "notes": [
+    {"date": "2025-03-15", "content": "Met at music-tech conference"}
+  ]
+}
+```
+
+**edges.json**:
+```json
+[
+  {
+    "source": "fronx",
+    "target": "blake",
+    "actual": 0.3,
+    "channels": ["email", "in_person"]
+  }
+]
+```
+
+**Embeddings** (stored separately in ChromaDB, not in JSON):
+- Phrase embeddings computed via sentence-transformers (`all-MiniLM-L6-v2`, 384 dims)
+- Cached in `./chroma_db/` directory (gitignored)
+- Mean embeddings computed on-demand from weighted phrase embeddings
+- Potential edge weights computed from embedding cosine similarity
+
 ### Key Components
 
-**Nodes**: Continuous semantic fields (not discrete vectors)
+**Nodes**: Phrase-level semantic fields
 - `id`: Unique identifier
 - `name`: Human-readable name
-- `phrases`: Array of phrase-level embeddings (the **primary representation**)
-  - `text`: The phrase itself
-  - `embedding`: Semantic vector for this specific phrase
-  - `weight`: Current activation (0-1) - **decays exponentially over time**
-  - `last_updated`: Timestamp of most recent mention - used for decay computation
-- `embedding.mean`: Optional pre-computed summary (convenience, not ground truth)
-- `embedding.covariance`: Optional uncertainty estimate
-- `is_self`: Ground truth (true) or prediction (false)
-- `prediction_confidence`: (0-1) How certain you are about this prediction (only for neighbors, also decays)
-- `last_updated`: When you last refined this prediction (only for neighbors)
+- `phrases`: Array of phrases (the **primary representation**)
+  - `text`: The phrase itself (embeddings stored separately in ChromaDB)
+  - `weight`: Current activation (0-1)
+  - `last_updated`: Timestamp of most recent mention
+- `capabilities`: (Optional) Skills/expertise the person can help with
+- `availability`: (Optional) Timestamped availability observations
+- `notes`: (Optional) Timestamped qualitative observations
 
-**Temporal dynamics**: Phrase weights decay exponentially (`w *= exp(-Δt / τ)` with τ ≈ 40 days). Re-mentioning a phrase bumps its weight back up. This creates a **living semantic field** that naturally forgets dormant topics and remembers actively-used concepts. See [TEMPORAL_DYNAMICS.md](TEMPORAL_DYNAMICS.md) for details.
+**Embeddings** (separate from JSON):
+- Stored in ChromaDB, not in JSON files
+- Computed via sentence-transformers (all-MiniLM-L6-v2, 384 dimensions)
+- Mean embeddings computed on-demand from weighted phrase embeddings
+- Used for semantic similarity and navigation metrics
 
-**Critical insight**: This is an **epistemic graph** of **continuous semantic fields**, not discrete position vectors. Blake also maintains their own ego graph with their ground truth field and their prediction of your field. Your prediction of Blake's field may differ from Blake's ground truth field. This asymmetry is fundamental to the privacy model.
+**Temporal dynamics** (planned for v0.3): Phrase weights will decay exponentially (`w *= exp(-Δt / τ)` with τ ≈ 40 days). Re-mentioning a phrase will bump its weight back up. This will create a **living semantic field** that naturally forgets dormant topics and remembers actively-used concepts. Currently timestamps are captured but decay is not yet implemented. See [TEMPORAL_DYNAMICS.md](TEMPORAL_DYNAMICS.md) for design.
 
-### Why Continuous Fields?
+**Critical insight**: This is an **epistemic graph** of **phrase-level semantic fields**, not discrete position vectors. Blake also maintains their own ego graph with their ground truth field and their prediction of your field. Your prediction of Blake's field may differ from Blake's ground truth field. This asymmetry is fundamental to the privacy model.
 
-**Previous approach**: Compute a single embedding per person (weighted average of phrases), then cluster into discrete "pockets."
+### Why Phrase-Level Embeddings?
+
+**Previous approach (v0.1)**: Single embedding vector per person stored in JSON.
 
 **Problems**:
-- **Premature hardening**: Clustering creates artificial boundaries between facets that might converge or synergize
-- **Feedback loops**: Discrete clusters amplify their own boundaries over time
-- **Loss of nuance**: A person's semantic field is richer than a single point or cluster label
+- **Lossy compression**: A person's semantic field reduced to one point
+- **Loss of nuance**: Multiple interests/facets collapsed together
+- **Hard to update**: Changing one topic required recomputing entire vector
 
-**New approach**: Keep all phrase-level embeddings, operate on **continuous kernel-weighted neighborhoods** instead of discrete clusters.
+**Current approach (v0.2)**: Phrase-level embeddings stored in ChromaDB, mean computed on-demand.
 
 **Benefits**:
+- Preserves semantic richness (multiple phrases per person)
+- Human-readable JSON (no embedding arrays cluttering files)
+- Easy to update (add/remove phrases independently)
+- Foundation for future continuous field operations
+
+**Future direction (v0.3)**: Operate on **continuous kernel-weighted neighborhoods** instead of discrete clusters for navigation metrics.
+
+**Future benefits** (when kernel methods are implemented):
 - Preserves semantic continuity and expressiveness
 - Structure emerges from ad-hoc analysis, not baked into stored data
 - Aligns with cognitive metaphor: navigating a **smooth meaning landscape**, not hopping between islands
 - Supports emergent detection of themes and bridges
 - Maintains Markov blanket principle (local inference, no global categorization)
 
-**Edges**: Two types of relationships
-- `actual`: Real interaction strength across time
-  - `past`: Historical interactions (weight 0-1)
-  - `present`: Current interactions (weight 0-1)
-  - `future`: Planned/desired interactions (weight 0-1)
-- `potential`: **Projected mutual predictability** - how well you and they can model each other's semantic field (not just cosine similarity)
+**Edges**: Relationship strength
+- `actual`: Real interaction strength (scalar 0-1)
+  - Represents current/recent interaction intensity
+  - Set manually based on actual communication patterns
+- `potential`: Semantic alignment (computed from embeddings)
+  - Cosine similarity of mean embeddings
+  - Computed automatically when loading ego graph
+- `channels`: (Optional) Communication channels (e.g., "video_calls", "in_person", "email")
+
+**Note**: Future versions may support temporal edge dimensions (past/present/future). See [TEMPORAL_DYNAMICS.md](TEMPORAL_DYNAMICS.md).
 
 The gap between `potential` and `actual` reveals **latent opportunities** - connections that would be mutually intelligible but haven't been actualized.
 
-## The Six Navigation Metrics (Continuous Field Version)
+## The Six Navigation Metrics
 
-The system computes multiple signals and combines them into **orientation scores** that guide your next interactions. All metrics operate on **continuous semantic fields** using kernel-weighted neighborhoods.
+The system computes multiple signals and combines them into **orientation scores** that guide your next interactions.
 
-### 1. Semantic Landscape Picture: Kernel-Based Neighborhoods
+**Current implementation (v0.2)**: Uses discrete clustering with phrase-level embeddings.
 
-**Goal**: Understand the topology of your semantic field and attention distribution
+**Planned evolution (v0.3)**: Transition to continuous kernel-weighted neighborhoods. The mathematical descriptions below represent the target architecture.
 
-**Method**: Compute soft neighborhood weights using Gaussian kernels
+### 1. Semantic Landscape Picture: Cluster Detection
+
+**Goal**: Understand the topology of your network and attention distribution
+
+**Current Method (v0.2)**: Discrete clustering using greedy modularity on mean embeddings
+
+```python
+# Build graph from neighbor subgraph
+# Apply greedy modularity community detection
+clusters = greedy_modularity_communities(neighbor_subgraph)
+
+# Attention distribution (where you actually spend time)
+attention[i] = interaction_strength[i] / sum_all(interaction_strength)
+attention_entropy = -sum(p * log(p)) for p in attention_distribution
+```
+
+**Planned Method (v0.3)**: Kernel-based soft neighborhoods
 
 ```python
 # For each pair of phrase embeddings, compute kernel similarity
 K[i,j] = exp(-||phrase_i.embedding - phrase_j.embedding||^2 / (2 * sigma^2))
-
-# This gives us soft "closeness" rather than discrete cluster membership
-# sigma controls the kernel bandwidth (typical: sigma = 0.5 to 2.0)
 
 # Aggregate kernel weights to person level
 K_person[i,j] = sum over phrases (
     K[phrase_i_k, phrase_j_l] * weight_i_k * weight_j_l
 )
 
-# Compute local density for each person (how "central" are they?)
+# Compute local density for each person
 density[i] = sum_j(K_person[i,j] * interaction_strength[i,j])
-
-# Attention distribution (where you actually spend time)
-attention[i] = interaction_strength[i] / sum_all(interaction_strength)
-attention_entropy = -sum(p * log(p)) for p in attention_distribution
 ```
 
 **Output**:

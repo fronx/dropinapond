@@ -21,9 +21,9 @@ Drop in a Pond has migrated from **discrete single-vector embeddings (v0.1)** to
 ## New Architecture
 
 ```
-User data (JSON)          ChromaDB (embeddings)
+User data (modular)      ChromaDB (embeddings)
     ↓                            ↓
-fronx.json  ←────────────→  chroma_db/
+fronx/          ←────────────→  chroma_db/
 (text only)              (phrase vectors)
                                 ↓
                          EmbeddingService
@@ -51,78 +51,111 @@ uv add chromadb sentence-transformers
 ### Loading Ego Graphs
 
 ```python
-from src.ego_ops import load_ego_from_json
+from src.storage import load_ego_graph
 from src.embeddings import get_embedding_service
 
 # Initialize embedding service
 service = get_embedding_service()
 
-# Load v0.2 graph
-ego = load_ego_from_json("data/ego_graphs/fronx.json", embedding_service=service)
+# Load v0.2 graph (directory path, not file)
+ego = load_ego_graph("data/ego_graphs/fronx", embedding_service=service)
 ```
 
-### JSON Format
+### Directory Structure
 
+v0.2 uses a modular directory structure:
+
+```
+data/ego_graphs/fronx/
+├── metadata.json           # Version and graph-level info
+├── self.json              # Ego node's semantic field
+├── connections/           # Individual files for each person
+│   ├── person1.json
+│   ├── person2.json
+│   └── ...
+├── edges.json            # All relationship edges
+└── contact_points.json   # Past/present/potential interactions
+```
+
+**metadata.json**:
 ```json
 {
   "version": "0.2",
-  "self": {
-    "id": "F",
-    "name": "Your Name",
-    "phrases": [
-      {
-        "text": "semantic navigation",
-        "weight": 0.9,
-        "last_updated": "2025-10-24"
-      }
-    ]
-  },
-  "connections": [
-    {
-      "id": "neighbor1",
-      "name": "Neighbor Name",
-      "phrases": [...]
-    }
-  ],
-  "edges": [
-    {"source": "F", "target": "neighbor1", "actual": 0.8}
+  "format": "modular",
+  "created_at": "2025-10-24",
+  "description": "Ego graph for Your Name"
+}
+```
+
+**self.json**:
+```json
+{
+  "id": "your_id",
+  "name": "Your Name",
+  "phrases": [
+    {"text": "semantic navigation", "weight": 0.9, "last_updated": "2025-10-24"}
   ]
 }
 ```
 
+**connections/person.json**:
+```json
+{
+  "id": "person_id",
+  "name": "Person Name",
+  "phrases": [
+    {"text": "topic area", "weight": 0.8, "last_updated": "2025-10-24"}
+  ],
+  "capabilities": ["skill1", "skill2"],
+  "availability": [
+    {"date": "2025-10-24", "score": 0.8, "content": "Generally available"}
+  ],
+  "notes": [
+    {"date": "2025-10-24", "content": "Met at conference, shared interest in X"}
+  ]
+}
+```
+
+**edges.json**:
+```json
+[
+  {
+    "source": "your_id",
+    "target": "person_id",
+    "actual": 0.8,
+    "channels": ["video_calls", "in_person"]
+  }
+]
+```
+
 ### Validation
 
-```python
-from src.validation import validate_ego_graph_file
+Schema validation infrastructure exists in `src/validation.py`, though schema files are still being developed.
 
-is_valid, errors = validate_ego_graph_file("path/to/graph.json", version="0.2")
-if not is_valid:
-    print("Errors:", errors)
-```
+## Breaking Changes
 
-## Backward Compatibility
+**v0.2 is NOT backward compatible with v0.1.** Legacy v0.1 support was removed to keep the codebase lean.
 
-The system still supports v0.1 format:
+If you have v0.1 data, you will need to manually convert it using the migration path below. This is a one-way upgrade.
 
-```python
-# v0.1 files load automatically without embedding_service
-ego = load_ego_from_json("old_graph.json")
-```
+## Manual Migration Path
 
-Format is auto-detected by checking for `"version": "0.2"` in JSON.
-
-## Migration Path
+**Note:** This is a manual process. No automated migration tool exists.
 
 To convert v0.1 → v0.2:
 
-1. Extract keyphrases into `phrases` array
-2. Add `text`, `weight`, `last_updated` to each phrase
-3. Remove `embedding` field from nodes
-4. Update edge format: `u/v` → `source/target`
-5. Restructure: separate focal node into `self` field, all others into `connections` array
-6. Remove `is_self` field (no longer needed)
-7. Add `version: "0.2"` field
-8. Embeddings will be computed automatically on first load
+1. Create directory structure: `data/ego_graphs/<name>/`
+2. Create `metadata.json` with version "0.2" and format "modular"
+3. Extract focal node into `self.json`
+4. Create `connections/` directory
+5. Split each connection into individual `connections/{id}.json` files
+6. Extract keyphrases into `phrases` array for each person
+7. Add `text`, `weight`, `last_updated` to each phrase
+8. Remove `embedding` field from all nodes (embeddings will be in ChromaDB)
+9. Update edge format: `u/v` → `source/target`, add `channels` if known
+10. Create `edges.json` with all relationship edges
+11. Create `contact_points.json` (optional, for temporal context)
+12. Embeddings will be computed automatically on first load
 
 ## ChromaDB Storage
 
@@ -139,7 +172,7 @@ service = get_embedding_service()
 # List all graphs
 graphs = service.list_collections()
 
-# Delete a graph's embeddings
+# Delete a graph's embeddings (use graph name, not collection name)
 service.delete_collection("fronx")
 ```
 

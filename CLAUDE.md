@@ -19,7 +19,7 @@ uv run python src/ego_ops.py fronx
 
 # Run analysis on a different ego graph
 uv run python src/ego_ops.py <graph_name>
-# (looks for data/ego_graphs/<graph_name>.json)
+# (looks for data/ego_graphs/<graph_name>/ directory)
 ```
 
 ### Ego Graph Building Sessions
@@ -55,37 +55,35 @@ uv run pytest tests/
 - Predictive models of immediate neighbors' semantic fields
 - Edge weights representing potential (semantic alignment) and actual (real interactions)
 
-**Continuous semantic fields**: The system uses phrase-level embeddings as the primary representation (not single vectors per person). Operates on kernel-weighted neighborhoods instead of discrete clusters. Clusters are computed on-demand for visualization only, never stored.
+**Continuous semantic fields**: The system uses phrase-level embeddings as the primary representation (not single vectors per person).
 
-**Temporal dynamics**: Phrase weights and edge strengths decay exponentially (τ ≈ 40 days). Re-mentioning a phrase bumps its weight back up, creating a "living graph" that naturally forgets dormant topics.
+**Temporal dynamics**: The data structure supports phrase weights and timestamps for future exponential decay (τ ≈ 40 days). Re-mentioning a phrase can bump its weight back up, creating a "living graph" that naturally forgets dormant topics.
 
 ### Six Navigation Metrics
 
-All metrics operate on continuous semantic fields using kernel methods:
+The system computes six metrics to help navigate your network:
 
-1. **Semantic landscape picture**: Kernel-based density and soft neighborhoods (Gaussian kernels)
-2. **Public legibility (R²_in)**: Kernel-weighted reconstruction of your semantic field by neighbors
-3. **Subjective attunement (R²_out)**: How well you reconstruct neighbors' fields (with legibility threshold)
-4. **Heat-residual novelty**: Topological distance using continuous diffusion geometry
-5. **Semantic gradients**: Local field translation (not discrete centroid differences)
+1. **Semantic landscape picture**: Cluster detection and semantic overlap analysis
+2. **Public legibility (R²_in)**: How well neighbors can reconstruct your semantic field (ridge regression)
+3. **Subjective attunement (R²_out)**: How well you understand neighbors' fields (with legibility threshold)
+4. **Heat-residual novelty**: Topological distance using diffusion on graph Laplacian
+5. **Translation vectors**: Semantic centroid differences between clusters
 6. **Orientation scores**: Composite metric for choosing next interactions
 
 ### Code Organization
 
 **src/storage.py**: Data loading and storage utilities
 - `EgoData` dataclass: Core data structure for ego graphs
-- `load_ego_from_json()`: Load from monolithic v0.2 JSON file
-- `load_ego_from_modular()`: Load from modular directory structure
-- `load_ego_graph()`: Auto-detect format and load
+- `load_ego_graph()`: Load from modular directory structure
 
 **src/ego_ops.py**: Navigation metrics and analysis
 - Utility functions (cosine similarity, normalization, R² metrics)
-- Semantic landscape picture (cluster detection + overlap/attention)
-- Public legibility (ridge regression)
-- Subjective attunement (includes gated rank-2 variant)
-- Heat-residual novelty (diffusion on graph Laplacian)
-- Translation vectors (centroid differences)
-- Orientation scores (composite metric)
+- Semantic landscape picture: `ego_clusters()` for cluster detection
+- Public legibility: `public_legibility_r2()` for ridge regression reconstruction
+- Subjective attunement: `subjective_attunement_r2()` (includes gated rank-2 variant)
+- Heat-residual novelty: `heat_residual_norm()` for diffusion on graph Laplacian
+- Translation vectors: `pocket_centroid()` for semantic centroid differences
+- Orientation scores: `orientation_score_breakdowns()` for composite metric
 - Command-line runner
 
 **src/translation_hints.py**: Finds lexical bridges between people's vocabularies using phrase-level semantic alignment
@@ -198,13 +196,10 @@ data/ego_graphs/name/
 - Phrase-level semantic fields (ChromaDB integration)
 - Sentence-transformer embeddings (`all-MiniLM-L6-v2`, 384 dims)
 - JSON schema validation
-- Example fixture with 8 people, realistic semantic clusters
+- Example fixture (fronx) with 15 people, realistic semantic clusters
 - Command-line analysis tool
 - Keyphrase translation hints
-- Backward compatibility with v0.1 format
-
-**🔜 In progress (current sprint)**:
-- Conversational interface (Claude-based ego graph builder)
+- Conversational interface (`/ego-session` command)
 
 **📋 Planned (v0.3+)**:
 - Kernel-based neighborhoods instead of discrete clusters
@@ -222,9 +217,9 @@ See `docs/V02_MIGRATION.md` for details on the v0.2 architecture.
 
 **Markov blanket principle**: All computations are local (1-2 hops from focal node). No need to see global network structure to make good navigation decisions.
 
-**Continuous over discrete**: Avoid premature hardening of semantic structure. Clusters create artificial boundaries and feedback loops. Keep representation continuous, compute structure on-demand.
+**Continuous over discrete**: Design principle to avoid premature hardening of semantic structure. Phrase-level embeddings provide the foundation for future continuous field operations.
 
-**Living memory**: Phrase weights and edge strengths decay exponentially. Re-mentioning bumps weight back up. The graph represents a "living present," not an archive.
+**Living memory**: Design principle for temporal dynamics. Timestamps are captured for future exponential decay implementation. The graph is designed to represent a "living present," not an archive.
 
 ## Adding New Metrics
 
@@ -236,9 +231,9 @@ See `docs/V02_MIGRATION.md` for details on the v0.2 architecture.
        return results
    ```
 
-2. Integrate in main pipeline (lines 681-end)
+2. Integrate in main pipeline (see `if __name__ == "__main__"` block at end of file)
 
-3. Optionally incorporate into orientation scores (lines 621-680)
+3. Optionally incorporate into orientation scores (see `orientation_score_breakdowns()` function)
 
 ## Mathematical Dependencies
 
@@ -246,8 +241,7 @@ The system combines:
 - **Spectral graph theory**: Laplacians, heat kernels, diffusion distance
 - **Statistical learning**: Ridge regression, R² metrics (scikit-learn)
 - **Information theory**: Shannon entropy for attention distribution
-- **Differential geometry**: Embeddings as manifolds, translation as tangent vectors
-- **Kernel methods**: Gaussian kernels for soft neighborhoods
+- **Graph algorithms**: Community detection (greedy modularity clustering)
 
 ## Performance Considerations
 

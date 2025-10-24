@@ -91,44 +91,31 @@ Claude: [After more conversation...]
   - 0.3-0.4: Distant but real
   - 0.1-0.2: Barely connected
 
-## File Structure
+## Data Structure
 
-Your ego graph is saved as `data/ego_graphs/{name}.json`:
+The conversational interface helps you build an ego graph that captures:
 
-```json
-{
-  "version": "0.2",
-  "focal_node": "F",
-  "metadata": {
-    "created_at": "2025-10-24",
-    "description": "Ego graph for Justin"
-  },
-  "nodes": [
-    {
-      "id": "F",
-      "name": "Justin",
-      "is_self": true,
-      "phrases": [
-        {"text": "audio embeddings", "weight": 0.9, "last_updated": "2025-10-24"},
-        {"text": "semantic search", "weight": 0.8, "last_updated": "2025-10-24"}
-      ]
-    },
-    {
-      "id": "L",
-      "name": "Lara",
-      "is_self": false,
-      "phrases": [
-        {"text": "playlist transitions", "weight": 0.8, "last_updated": "2025-10-24"}
-      ]
-    }
-  ],
-  "edges": [
-    {"source": "F", "target": "L", "actual": 0.9}
-  ]
-}
-```
+**About You (self)**:
+- Your semantic field: phrases describing your interests/expertise
+- Phrase weights: how central each topic is to you (0-1)
+- Last updated timestamps
 
-Embeddings are automatically cached in `./chroma_db/` (not in JSON).
+**About Others (connections)**:
+- Their semantic fields: your model of their interests/expertise
+- Capabilities: skills they can help with
+- Availability: when/how responsive they are
+- Notes: qualitative observations about them
+
+**Relationships (edges)**:
+- Actual interaction strength (0-1): how much you actually engage
+- Channels: how you communicate (video calls, in person, email, etc.)
+
+**Shared Context (contact points)**:
+- Past interactions: how you met, past collaborations
+- Present opportunities: active projects, ongoing conversations
+- Potential connections: ideas for future collaboration
+
+For technical implementation details, see [`.claude/commands/ego-session.md`](../.claude/commands/ego-session.md).
 
 ## Navigation Insights
 
