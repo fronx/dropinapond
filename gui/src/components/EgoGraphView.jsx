@@ -10,7 +10,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { PersonNode } from './PersonNode';
-import { loadEgoGraph, parseEgoGraphForFlow } from '../lib/egoGraphLoader';
+import { loadEgoGraph, loadLatestAnalysis, parseEgoGraphForFlow } from '../lib/egoGraphLoader';
 import { createForceSimulation } from '../lib/d3Layout';
 import { updateEdgeHandles } from '../lib/edgeUtils';
 
@@ -37,8 +37,14 @@ export function EgoGraphView() {
         const egoData = await loadEgoGraph(graphName || 'fronx');
         setMetadata(egoData.metadata);
 
-        // Parse into xyflow format
-        const { nodes: parsedNodes, edges: parsedEdges } = parseEgoGraphForFlow(egoData);
+        // Load analysis data (if available)
+        const analysisData = await loadLatestAnalysis(graphName || 'fronx');
+        if (analysisData) {
+          console.log('Loaded analysis data:', analysisData);
+        }
+
+        // Parse into xyflow format with analysis data
+        const { nodes: parsedNodes, edges: parsedEdges } = parseEgoGraphForFlow(egoData, analysisData);
 
         console.log('Loaded nodes:', parsedNodes);
         console.log('Loaded edges:', parsedEdges);

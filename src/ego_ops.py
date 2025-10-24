@@ -5,6 +5,7 @@ from typing import Dict, List, Iterable, Tuple, Optional
 import json
 import sys
 from pathlib import Path
+from datetime import datetime
 import numpy as np
 import networkx as nx
 from scipy.linalg import expm
@@ -550,6 +551,101 @@ def diffusion_distance_to_pocket(ego, pocket, t=0.25, eps=1e-12):
     D2 = np.sum((diff**2)/(pi+eps))
     return float(np.sqrt(D2))
 
+# ---------------------------
+# Analysis JSON export
+# ---------------------------
+
+def save_analysis_json(
+    ego_graph_path: Path,
+    overlaps: Dict[str, float],
+    clusters: List[set],
+    attention_entropy: float,
+    r2_in_all: float,
+    r2_in_per_cluster: Dict[int, float],
+    r2_out: Dict[int, float],
+    s_t: Dict[int, float],
+    r2_in_per_neighbor: Dict[str, float],
+    scores: Dict[str, float],
+    output_dir: Optional[Path] = None
+) -> Path:
+    """
+    Save analysis results to JSON file.
+
+    Args:
+        ego_graph_path: Path to the original ego graph JSON file
+        overlaps: Dict of node_id -> overlap score
+        clusters: List of cluster sets
+        attention_entropy: Entropy of attention distribution
+        r2_in_all: Overall public legibility R^2
+        r2_in_per_cluster: Per-cluster public legibility R^2
+        r2_out: Per-cluster subjective attunement R^2
+        s_t: Per-cluster heat-residual novelty
+        r2_in_per_neighbor: Per-neighbor readability R^2
+        scores: Orientation scores per neighbor
+        output_dir: Directory to save analysis (defaults to data/analyses/)
+
+    Returns:
+        Path to saved JSON file
+    """
+    if output_dir is None:
+        output_dir = Path(__file__).parent.parent / "data" / "analyses"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load ego graph version
+    with open(ego_graph_path) as f:
+        ego_graph_data = json.load(f)
+    ego_graph_version = ego_graph_data.get("version", "unknown")
+
+    # Convert clusters from sets to sorted lists for JSON serialization
+    clusters_serializable = [sorted(list(c)) for c in clusters]
+
+    # Convert cluster-keyed dicts to use tuple-of-names as keys (more readable)
+    def cluster_dict_to_serializable(cluster_dict):
+        return {
+            ", ".join(sorted(list(clusters[k]))): v
+            for k, v in cluster_dict.items()
+        }
+
+    # Sort recommendations by score (descending)
+    recommendations = [
+        {"node_id": node_id, "score": score}
+        for node_id, score in sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    analysis = {
+        "version": "1.0",
+        "timestamp": datetime.now().isoformat(),
+        "ego_graph_file": str(ego_graph_path.name),
+        "ego_graph_version": ego_graph_version,
+        "metrics": {
+            "overlaps": overlaps,
+            "clusters": clusters_serializable,
+            "attention_entropy": attention_entropy,
+            "public_legibility_overall": r2_in_all,
+            "public_legibility_per_cluster": cluster_dict_to_serializable(r2_in_per_cluster),
+            "subjective_attunement_per_cluster": cluster_dict_to_serializable(r2_out),
+            "heat_residual_novelty": cluster_dict_to_serializable(s_t),
+            "per_neighbor_readability": r2_in_per_neighbor,
+            "orientation_scores": scores
+        },
+        "recommendations": recommendations
+    }
+
+    # Generate filename with timestamp
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ego_graph_name = ego_graph_path.stem
+    output_path = output_dir / f"{ego_graph_name}_{timestamp_str}.json"
+
+    with open(output_path, 'w') as f:
+        json.dump(analysis, f, indent=2)
+
+    # Also save as _latest.json for easy web access
+    latest_path = output_dir / f"{ego_graph_name}_latest.json"
+    with open(latest_path, 'w') as f:
+        json.dump(analysis, f, indent=2)
+
+    return output_path
+
 if __name__ == "__main__":
     # Get filename from command line
     if len(sys.argv) < 2:
@@ -641,6 +737,21 @@ if __name__ == "__main__":
     print("\nOrientation scores (higher is better):", {format_node(j): round(scores[j],3) for j in neighbors})
     best = max(scores, key=scores.__getitem__)
     print(f"\nBest next approach: {format_node(best)}")
+
+    # Save analysis to JSON
+    analysis_path = save_analysis_json(
+        ego_graph_path=fixture_path,
+        overlaps=overlaps,
+        clusters=clusters,
+        attention_entropy=H,
+        r2_in_all=r2_in_all,
+        r2_in_per_cluster=r2_in_per_cluster,
+        r2_out=r2_out,
+        s_t=s_t,
+        r2_in_per_neighbor=r2_in_per_neighbor,
+        scores=scores
+    )
+    print(f"\nAnalysis saved to: {analysis_path}")
 
     # Visualization
     print("\nGenerating visualization...")

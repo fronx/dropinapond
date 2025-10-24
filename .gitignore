@@ -32,6 +32,9 @@ chroma_db/
 data/ego_graphs/*
 !data/ego_graphs/.gitkeep
 
+# Analysis results (generated files)
+data/analyses/
+
 # IDEs
 .vscode/
 .idea/
