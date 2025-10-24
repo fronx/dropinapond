@@ -1,11 +1,15 @@
 import { Handle, Position } from '@xyflow/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import chroma from 'chroma-js';
+import { getMetricLabel } from '../lib/metricLabels';
 
 export function PersonNode({ data, selected }) {
   const { person, isSelf, connectionStrength = 0.5, clusterColor, analysisMetrics } = data;
   const latestAvailability = person.availability?.[0];
   const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const nodeRef = useRef(null);
 
   // Detect dark mode
   const [isDarkMode, setIsDarkMode] = useState(
@@ -74,10 +78,22 @@ export function PersonNode({ data, selected }) {
     color: textColor,
   };
 
+  const handleMouseEnter = () => {
+    if (nodeRef.current) {
+      const rect = nodeRef.current.getBoundingClientRect();
+      setTooltipPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.bottom + 8
+      });
+    }
+    setShowTooltip(true);
+  };
+
   return (
     <div
+      ref={nodeRef}
       style={nodeStyle}
-      onMouseEnter={() => setShowTooltip(true)}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShowTooltip(false)}
     >
       {/* Handles for edge connections */}
@@ -109,41 +125,65 @@ export function PersonNode({ data, selected }) {
 
       {person.name}
 
-      {/* Analysis metrics tooltip */}
-      {showTooltip && analysisMetrics && !isSelf && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          marginTop: '8px',
-          backgroundColor: isDarkMode ? '#1f2937' : 'white',
-          border: `1px solid ${isDarkMode ? '#374151' : '#d1d5db'}`,
-          borderRadius: '6px',
-          padding: '8px 12px',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-          fontSize: '0.4rem',
-          whiteSpace: 'nowrap',
-          zIndex: 1000,
-          pointerEvents: 'none',
-        }}>
-          {analysisMetrics.orientationScore !== undefined && (
-            <div style={{ marginBottom: '4px', color: isDarkMode ? '#93c5fd' : '#1e40af', fontWeight: '600' }}>
-              Orientation: {analysisMetrics.orientationScore.toFixed(2)}
-            </div>
-          )}
-          {analysisMetrics.readability !== undefined && (
-            <div style={{ marginBottom: '4px', color: isDarkMode ? '#d1d5db' : '#374151' }}>
-              Readability: {analysisMetrics.readability.toFixed(2)}
-            </div>
-          )}
-          {analysisMetrics.overlap !== undefined && (
-            <div style={{ color: isDarkMode ? '#d1d5db' : '#374151' }}>
-              Overlap: {analysisMetrics.overlap.toFixed(2)}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Analysis metrics tooltip - rendered via portal */}
+      {showTooltip && analysisMetrics && !isSelf && (() => {
+        const orientationLabel = analysisMetrics.orientationScore !== undefined
+          ? getMetricLabel('orientation_score', analysisMetrics.orientationScore)
+          : null;
+        const readabilityLabel = analysisMetrics.readability !== undefined
+          ? getMetricLabel('readability', analysisMetrics.readability)
+          : null;
+        const overlapLabel = analysisMetrics.overlap !== undefined
+          ? getMetricLabel('overlap', analysisMetrics.overlap)
+          : null;
+
+        const tooltipContent = (
+          <div style={{
+            position: 'fixed',
+            left: `${tooltipPosition.x}px`,
+            top: `${tooltipPosition.y}px`,
+            transform: 'translateX(-50%)',
+            backgroundColor: isDarkMode ? '#1f2937' : 'white',
+            border: `1px solid ${isDarkMode ? '#374151' : '#d1d5db'}`,
+            borderRadius: '8px',
+            padding: '12px 16px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            fontSize: '0.875rem',
+            whiteSpace: 'nowrap',
+            zIndex: 9999,
+            pointerEvents: 'none',
+          }}>
+            {orientationLabel && (
+              <div style={{ marginBottom: '6px', color: isDarkMode ? '#93c5fd' : '#1e40af', fontWeight: '600', fontSize: '0.9rem' }}>
+                {orientationLabel.label}
+              </div>
+            )}
+            {readabilityLabel && (
+              <div style={{ marginBottom: '4px', color: isDarkMode ? '#d1d5db' : '#374151' }}>
+                {readabilityLabel.label}
+              </div>
+            )}
+            {overlapLabel && (
+              <div style={{ color: isDarkMode ? '#d1d5db' : '#374151' }}>
+                {overlapLabel.label}
+              </div>
+            )}
+            {orientationLabel && (
+              <div style={{
+                marginTop: '8px',
+                paddingTop: '8px',
+                borderTop: `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`,
+                color: isDarkMode ? '#9ca3af' : '#6b7280',
+                fontSize: '0.8rem'
+              }}>
+                {orientationLabel.description}
+              </div>
+            )}
+          </div>
+        );
+
+        return createPortal(tooltipContent, document.body);
+      })()}
     </div>
   );
 }

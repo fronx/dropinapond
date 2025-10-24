@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getMetricLabel } from '../lib/metricLabels';
 
 export function AnalysisPanel({ clusterMetrics, overallMetrics, recommendations, nodeNameMap }) {
   const [isDarkMode, setIsDarkMode] = useState(
@@ -94,13 +95,45 @@ export function AnalysisPanel({ clusterMetrics, overallMetrics, recommendations,
           {overallMetrics && (
             <div style={sectionStyle}>
               <div style={sectionTitleStyle}>Overall Metrics</div>
-              <div style={metricRowStyle}>
-                <span style={labelStyle}>Public Legibility</span>
-                <span style={valueStyle}>{overallMetrics.publicLegibilityOverall?.toFixed(3) || 'N/A'}</span>
+              <div style={{ marginBottom: '12px' }}>
+                <div style={metricRowStyle}>
+                  <span style={labelStyle}>Public Legibility</span>
+                  <span style={valueStyle}>
+                    {overallMetrics.publicLegibilityOverall
+                      ? getMetricLabel('public_legibility', overallMetrics.publicLegibilityOverall).label
+                      : 'N/A'}
+                  </span>
+                </div>
+                {overallMetrics.publicLegibilityOverall && (
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: isDarkMode ? '#6b7280' : '#9ca3af',
+                    marginTop: '2px',
+                    fontStyle: 'italic'
+                  }}>
+                    {getMetricLabel('public_legibility', overallMetrics.publicLegibilityOverall).description}
+                  </div>
+                )}
               </div>
-              <div style={metricRowStyle}>
-                <span style={labelStyle}>Attention Entropy</span>
-                <span style={valueStyle}>{overallMetrics.attentionEntropy?.toFixed(3) || 'N/A'}</span>
+              <div>
+                <div style={metricRowStyle}>
+                  <span style={labelStyle}>Attention Spread</span>
+                  <span style={valueStyle}>
+                    {overallMetrics.attentionEntropy
+                      ? getMetricLabel('attention_entropy', overallMetrics.attentionEntropy).label
+                      : 'N/A'}
+                  </span>
+                </div>
+                {overallMetrics.attentionEntropy && (
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: isDarkMode ? '#6b7280' : '#9ca3af',
+                    marginTop: '2px',
+                    fontStyle: 'italic'
+                  }}>
+                    {getMetricLabel('attention_entropy', overallMetrics.attentionEntropy).description}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -110,6 +143,7 @@ export function AnalysisPanel({ clusterMetrics, overallMetrics, recommendations,
               <div style={sectionTitleStyle}>Top Recommendations</div>
               {recommendations.slice(0, 5).map((rec, idx) => {
                 const displayName = nodeNameMap?.[rec.node_id] || rec.node_id;
+                const scoreLabel = getMetricLabel('orientation_score', rec.score).label;
                 return (
                   <div key={rec.node_id} style={{
                     ...metricRowStyle,
@@ -123,7 +157,7 @@ export function AnalysisPanel({ clusterMetrics, overallMetrics, recommendations,
                       ...valueStyle,
                       color: idx === 0 ? (isDarkMode ? '#93c5fd' : '#1e40af') : valueStyle.color,
                     }}>
-                      {rec.score.toFixed(2)}
+                      {scoreLabel}
                     </span>
                   </div>
                 );
@@ -149,20 +183,56 @@ export function AnalysisPanel({ clusterMetrics, overallMetrics, recommendations,
                       {clusterName}
                     </div>
                     <div style={{ paddingLeft: '8px' }}>
-                      <div style={{ ...metricRowStyle, fontSize: '0.75rem' }}>
-                        <span style={labelStyle}>Legibility</span>
-                        <span style={valueStyle}>{value?.toFixed(3)}</span>
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ ...metricRowStyle, fontSize: '0.75rem' }}>
+                          <span style={labelStyle}>Legibility</span>
+                          <span style={valueStyle}>
+                            {getMetricLabel('public_legibility', value).label}
+                          </span>
+                        </div>
+                        <div style={{
+                          fontSize: '0.7rem',
+                          color: isDarkMode ? '#6b7280' : '#9ca3af',
+                          marginTop: '2px',
+                          fontStyle: 'italic'
+                        }}>
+                          {getMetricLabel('public_legibility', value).description}
+                        </div>
                       </div>
                       {attunement !== undefined && (
-                        <div style={{ ...metricRowStyle, fontSize: '0.75rem' }}>
-                          <span style={labelStyle}>Attunement</span>
-                          <span style={valueStyle}>{attunement.toFixed(3)}</span>
+                        <div style={{ marginBottom: '8px' }}>
+                          <div style={{ ...metricRowStyle, fontSize: '0.75rem' }}>
+                            <span style={labelStyle}>Attunement</span>
+                            <span style={valueStyle}>
+                              {getMetricLabel('subjective_attunement', attunement).label}
+                            </span>
+                          </div>
+                          <div style={{
+                            fontSize: '0.7rem',
+                            color: isDarkMode ? '#6b7280' : '#9ca3af',
+                            marginTop: '2px',
+                            fontStyle: 'italic'
+                          }}>
+                            {getMetricLabel('subjective_attunement', attunement).description}
+                          </div>
                         </div>
                       )}
                       {novelty !== undefined && (
-                        <div style={{ ...metricRowStyle, fontSize: '0.75rem' }}>
-                          <span style={labelStyle}>Novelty</span>
-                          <span style={valueStyle}>{novelty.toFixed(3)}</span>
+                        <div>
+                          <div style={{ ...metricRowStyle, fontSize: '0.75rem' }}>
+                            <span style={labelStyle}>Novelty</span>
+                            <span style={valueStyle}>
+                              {getMetricLabel('heat_residual_novelty', novelty).label}
+                            </span>
+                          </div>
+                          <div style={{
+                            fontSize: '0.7rem',
+                            color: isDarkMode ? '#6b7280' : '#9ca3af',
+                            marginTop: '2px',
+                            fontStyle: 'italic'
+                          }}>
+                            {getMetricLabel('heat_residual_novelty', novelty).description}
+                          </div>
                         </div>
                       )}
                     </div>

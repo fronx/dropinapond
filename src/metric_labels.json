@@ -12,32 +12,32 @@
         {
           "min": -1.0,
           "max": 0.05,
-          "label": "opaque",
-          "description": "Unable to reconstruct interests; semantic fields are orthogonal or misaligned"
+          "label": "doesn't get you",
+          "description": "No overlap in what you care about"
         },
         {
           "min": 0.05,
           "max": 0.15,
-          "label": "barely legible",
-          "description": "Minimal understanding; can capture only surface-level aspects of interests"
+          "label": "barely gets you",
+          "description": "Knows you superficially"
         },
         {
           "min": 0.15,
           "max": 0.30,
-          "label": "somewhat understood",
-          "description": "Moderate reconstruction capability; grasps general themes but misses nuances"
+          "label": "sort of gets you",
+          "description": "Knows the basics, not the details"
         },
         {
           "min": 0.30,
           "max": 0.50,
-          "label": "well understood",
-          "description": "Strong reconstruction; neighbor's semantic position effectively models interests"
+          "label": "gets you",
+          "description": "Understands what you're interested in"
         },
         {
           "min": 0.50,
           "max": 1.0,
-          "label": "highly transparent",
-          "description": "Exceptional understanding; neighbor's field nearly perfectly predicts interests"
+          "label": "really gets you",
+          "description": "Knows exactly what you care about"
         }
       ]
     },
@@ -51,38 +51,38 @@
         {
           "min": 0.0,
           "max": 0.05,
-          "label": "distinct circles",
-          "description": "Almost no shared contacts. Strong structural hole - this connection provides access to an entirely separate network"
+          "label": "different worlds",
+          "description": "Opens up a whole new circle"
         },
         {
           "min": 0.05,
           "max": 0.15,
-          "label": "minimal overlap",
-          "description": "Very few mutual connections. Weak bridge offering diverse perspectives and novel information flow"
+          "label": "mostly separate",
+          "description": "Few friends in common"
         },
         {
           "min": 0.15,
           "max": 0.35,
-          "label": "moderate overlap",
-          "description": "Some shared acquaintances. Partial bridge between networks with both familiar and novel contacts"
+          "label": "some overlap",
+          "description": "Some mutual friends"
         },
         {
           "min": 0.35,
           "max": 0.60,
-          "label": "high overlap",
-          "description": "Many mutual connections. Strong embeddedness within the same social cluster - redundant but reinforcing"
+          "label": "lots of overlap",
+          "description": "Know many of the same people"
         },
         {
           "min": 0.60,
           "max": 0.85,
-          "label": "heavy overlap",
-          "description": "Most contacts are shared. Highly embedded in same tight-knit group with limited novelty potential"
+          "label": "same crowd",
+          "description": "Mostly the same friend group"
         },
         {
           "min": 0.85,
           "max": 1.0,
-          "label": "nearly identical networks",
-          "description": "Almost complete neighbor overlap. Redundant connection providing minimal new network access"
+          "label": "identical circles",
+          "description": "Basically the same social circle"
         }
       ]
     },
@@ -96,38 +96,212 @@
         {
           "min": -1.25,
           "max": 0.8,
-          "label": "poor fit",
-          "description": "Low strategic value. Either semantically misaligned, poorly understood, or part of an unfamiliar cluster. Consider only if exploring entirely new territory"
+          "label": "not a fit",
+          "description": "Probably not worth reaching out"
         },
         {
           "min": 0.8,
           "max": 1.5,
-          "label": "limited potential",
-          "description": "Below-average strategic value. May have network overlap or modest semantic alignment, but lacks strong mutual understanding or topical relevance"
+          "label": "might be worth it",
+          "description": "Could be interesting to reconnect"
         },
         {
           "min": 1.5,
           "max": 2.1,
-          "label": "moderate potential",
-          "description": "Solid strategic value. Balanced combination of network novelty, mutual legibility, and semantic relevance. A reasonable choice for next interaction"
+          "label": "worth reaching out",
+          "description": "Good person to talk to"
         },
         {
           "min": 2.1,
           "max": 2.7,
-          "label": "high potential",
-          "description": "Strong strategic value. Excellent balance of exploration (non-overlapping network), understanding (good attunement), and topical alignment. Prioritize for next interaction"
+          "label": "definitely reach out",
+          "description": "Great conversation potential"
         },
         {
           "min": 2.7,
           "max": 3.3,
-          "label": "exceptional fit",
-          "description": "Outstanding strategic value. Near-optimal across all dimensions: opens new network territory, strong mutual understanding, highly relevant to current focus. Top priority for engagement"
+          "label": "top priority",
+          "description": "Make time for this one"
         },
         {
           "min": 3.3,
           "max": 3.7,
-          "label": "ideal target",
-          "description": "Maximum strategic value. Perfect storm of network novelty, mutual legibility, cluster attunement, and semantic alignment. Extremely rare—pursue immediately if stable"
+          "label": "don't miss this",
+          "description": "Rare opportunity"
+        }
+      ]
+    },
+    "public_legibility": {
+      "theoretical_range": {
+        "min": -1.0,
+        "max": 1.0
+      },
+      "conceptual_meaning": "How well the network collectively reconstructs your semantic field from neighbors' embeddings. Higher values mean your interests are well-represented and predictable from your network.",
+      "labels": [
+        {
+          "min": -1.0,
+          "max": 0.0,
+          "label": "poor coverage",
+          "description": "Your network doesn't cover your interests"
+        },
+        {
+          "min": 0.0,
+          "max": 0.3,
+          "label": "weak coverage",
+          "description": "Large gaps in network coverage"
+        },
+        {
+          "min": 0.3,
+          "max": 0.5,
+          "label": "partial coverage",
+          "description": "Some coverage of your interests"
+        },
+        {
+          "min": 0.5,
+          "max": 0.7,
+          "label": "decent coverage",
+          "description": "Solid coverage of your interests"
+        },
+        {
+          "min": 0.7,
+          "max": 0.85,
+          "label": "good coverage",
+          "description": "Good coverage of your interests across your network"
+        },
+        {
+          "min": 0.85,
+          "max": 1.0,
+          "label": "complete coverage",
+          "description": "Network fully covers your interests"
+        }
+      ]
+    },
+    "attention_entropy": {
+      "theoretical_range": {
+        "min": 0.0,
+        "max": 3.3
+      },
+      "conceptual_meaning": "Shannon entropy of attention distribution across network clusters. Higher values indicate more evenly distributed attention; lower values indicate concentration in fewer clusters.",
+      "labels": [
+        {
+          "min": 0.0,
+          "max": 0.5,
+          "label": "laser focused",
+          "description": "All attention on one group"
+        },
+        {
+          "min": 0.5,
+          "max": 1.2,
+          "label": "pretty focused",
+          "description": "Mostly one or two main groups"
+        },
+        {
+          "min": 1.2,
+          "max": 2.0,
+          "label": "balanced",
+          "description": "Spread across several groups"
+        },
+        {
+          "min": 2.0,
+          "max": 2.7,
+          "label": "exploring broadly",
+          "description": "Talking to lots of different groups"
+        },
+        {
+          "min": 2.7,
+          "max": 10.0,
+          "label": "all over the place",
+          "description": "Spread super thin across everyone"
+        }
+      ]
+    },
+    "subjective_attunement": {
+      "theoretical_range": {
+        "min": -1.0,
+        "max": 1.0
+      },
+      "conceptual_meaning": "How well you can predict and understand this cluster's semantic interests from your own field. Higher values mean you grasp what matters to them.",
+      "labels": [
+        {
+          "min": -1.0,
+          "max": 0.0,
+          "label": "don't get them",
+          "description": "Have no idea what they care about"
+        },
+        {
+          "min": 0.0,
+          "max": 0.15,
+          "label": "barely get them",
+          "description": "Don't really understand their world"
+        },
+        {
+          "min": 0.15,
+          "max": 0.30,
+          "label": "sort of get them",
+          "description": "Basic sense of what they're into"
+        },
+        {
+          "min": 0.30,
+          "max": 0.45,
+          "label": "get them",
+          "description": "Decent understanding of their interests"
+        },
+        {
+          "min": 0.45,
+          "max": 0.70,
+          "label": "really get them",
+          "description": "Know what matters to this group"
+        },
+        {
+          "min": 0.70,
+          "max": 1.0,
+          "label": "totally get them",
+          "description": "Fully understand what they're about"
+        }
+      ]
+    },
+    "heat_residual_novelty": {
+      "theoretical_range": {
+        "min": 0.0,
+        "max": 0.2
+      },
+      "conceptual_meaning": "Topological semantic distance between you and cluster after heat diffusion. Higher values mean the cluster operates in distinct semantic territory.",
+      "labels": [
+        {
+          "min": 0.0,
+          "max": 0.03,
+          "label": "very familiar",
+          "description": "Right in your wheelhouse"
+        },
+        {
+          "min": 0.03,
+          "max": 0.05,
+          "label": "familiar",
+          "description": "Comfortable territory"
+        },
+        {
+          "min": 0.05,
+          "max": 0.08,
+          "label": "somewhat new",
+          "description": "Some fresh perspectives here"
+        },
+        {
+          "min": 0.08,
+          "max": 0.12,
+          "label": "pretty new",
+          "description": "Good chance to learn something"
+        },
+        {
+          "min": 0.12,
+          "max": 0.20,
+          "label": "very new",
+          "description": "Totally different world"
+        },
+        {
+          "min": 0.20,
+          "max": 2.0,
+          "label": "completely foreign",
+          "description": "Nothing in common"
         }
       ]
     }

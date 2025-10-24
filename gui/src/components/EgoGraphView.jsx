@@ -3,15 +3,12 @@ import { useParams } from 'react-router-dom';
 import {
   ReactFlow,
   Background,
-  Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { PersonNode } from './PersonNode';
 import { AnalysisPanel } from './AnalysisPanel';
-import { SimplifiedMetricsLegend } from './SimplifiedMetricsLegend';
 import { loadEgoGraph, loadLatestAnalysis, parseEgoGraphForFlow } from '../lib/egoGraphLoader';
 import { createForceSimulation } from '../lib/d3Layout';
 import { updateEdgeHandles } from '../lib/edgeUtils';
@@ -128,9 +125,6 @@ export function EgoGraphView() {
           {/* <Controls /> */}
         </ReactFlow>
       </div>
-
-      {/* Simplified Metrics Legend (left side) */}
-      <SimplifiedMetricsLegend />
 
       {/* Analysis Panel (right side) */}
       {analysisData && (
