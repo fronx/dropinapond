@@ -12,6 +12,7 @@ import '@xyflow/react/dist/style.css';
 import { PersonNode } from './PersonNode';
 import { loadEgoGraph, parseEgoGraphForFlow } from '../lib/egoGraphLoader';
 import { createForceSimulation } from '../lib/d3Layout';
+import { updateEdgeHandles } from '../lib/edgeUtils';
 
 const nodeTypes = {
   personNode: PersonNode,
@@ -50,6 +51,9 @@ export function EgoGraphView() {
           parsedEdges,
           (updatedNodes) => {
             setNodes(updatedNodes);
+            // Update edge handles based on new node positions
+            const updatedEdges = updateEdgeHandles(parsedEdges, updatedNodes);
+            setEdges(updatedEdges);
           }
         );
 

@@ -23,10 +23,14 @@ export function PersonNode({ data, selected }) {
   return (
     <div style={nodeStyle}>
       {/* Handles for edge connections */}
-      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
-      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Top} id="target-top" style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Bottom} id="source-bottom" style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Left} id="target-left" style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Right} id="source-right" style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Top} id="source-top" style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Bottom} id="target-bottom" style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Left} id="source-left" style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Right} id="target-right" style={{ opacity: 0 }} />
 
       {/* Availability indicator dot */}
       {latestAvailability && (
