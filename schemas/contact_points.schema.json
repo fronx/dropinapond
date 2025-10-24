@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://dropinapond.dev/schemas/contact_points.schema.json",
+  "title": "Contact Points",
+  "description": "Relational and historical information about interactions",
+  "type": "object",
+  "properties": {
+    "past": {
+      "type": "array",
+      "description": "Historical interactions and origin stories",
+      "items": {
+        "type": "object",
+        "required": ["people", "content"],
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Date or date range (flexible format)",
+            "examples": ["2024-05", "2015", "2015-2025"]
+          },
+          "people": {
+            "type": "array",
+            "description": "IDs of people involved",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "channels": {
+            "type": "array",
+            "description": "Communication channels used",
+            "items": {
+              "type": "string"
+            }
+          },
+          "content": {
+            "type": "string",
+            "description": "Description of the interaction or relationship formation"
+          }
+        }
+      }
+    },
+    "present": {
+      "type": "array",
+      "description": "Current ongoing interactions",
+      "items": {
+        "type": "object",
+        "required": ["people", "content"],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Current date or observation date"
+          },
+          "people": {
+            "type": "array",
+            "description": "IDs of people involved",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "channels": {
+            "type": "array",
+            "description": "Communication channels used",
+            "items": {
+              "type": "string"
+            }
+          },
+          "frequency": {
+            "type": "string",
+            "description": "How often interactions occur",
+            "examples": ["daily", "weekly", "monthly", "occasional", "sporadic", "semi-regular"]
+          },
+          "content": {
+            "type": "string",
+            "description": "Description of current interaction pattern"
+          }
+        }
+      }
+    },
+    "potential": {
+      "type": "array",
+      "description": "Future possibilities and plans",
+      "items": {
+        "type": "object",
+        "required": ["people", "content"],
+        "properties": {
+          "people": {
+            "type": "array",
+            "description": "IDs of people involved",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "channels": {
+            "type": "array",
+            "description": "Potential communication channels",
+            "items": {
+              "type": "string"
+            }
+          },
+          "content": {
+            "type": "string",
+            "description": "Description of potential interaction or collaboration"
+          }
+        }
+      }
+    }
+  }
+}

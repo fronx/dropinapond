@@ -72,66 +72,109 @@ All metrics operate on continuous semantic fields using kernel methods:
 
 ### Code Organization
 
-**src/ego_ops.py** (20KB, ~680 lines): Core module containing all navigation metrics
-- Lines 1-50: Data structures (`EgoData` dataclass, JSON loading)
-- Lines 51-150: Utility functions (cosine similarity, normalization, R² metrics)
-- Lines 151-250: Semantic landscape picture (cluster detection + overlap/attention)
-- Lines 251-320: Public legibility (ridge regression)
-- Lines 321-450: Subjective attunement (includes gated rank-2 variant at 440-449)
-- Lines 451-550: Heat-residual novelty (diffusion on graph Laplacian)
-- Lines 551-620: Translation vectors (centroid differences)
-- Lines 621-680: Orientation scores (composite metric)
-- Lines 681-end: Command-line runner
+**src/storage.py**: Data loading and storage utilities
+- `EgoData` dataclass: Core data structure for ego graphs
+- `load_ego_from_json()`: Load from monolithic v0.2 JSON file
+- `load_ego_from_modular()`: Load from modular directory structure
+- `load_ego_graph()`: Auto-detect format and load
 
-**src/translation_hints.py** (1.6KB): Finds lexical bridges between people's vocabularies using phrase-level semantic alignment
+**src/ego_ops.py**: Navigation metrics and analysis
+- Utility functions (cosine similarity, normalization, R² metrics)
+- Semantic landscape picture (cluster detection + overlap/attention)
+- Public legibility (ridge regression)
+- Subjective attunement (includes gated rank-2 variant)
+- Heat-residual novelty (diffusion on graph Laplacian)
+- Translation vectors (centroid differences)
+- Orientation scores (composite metric)
+- Command-line runner
 
-**data/ego_graphs/*.json**: Example ego graph data files
+**src/translation_hints.py**: Finds lexical bridges between people's vocabularies using phrase-level semantic alignment
 
-### Data Format (v0.2 - Phrase-Level with ChromaDB)
+**src/embeddings.py**: ChromaDB integration for phrase embeddings
 
-Ego graphs are JSON files with this structure (embeddings stored separately in ChromaDB):
+**data/ego_graphs/**: Ego graph data in modular directory format
+- Each ego graph is a directory: `name/`
+- Files are split for better editability and git tracking
 
+### Data Format (v0.2 - Modular with ChromaDB)
+
+Ego graphs use a modular directory structure (embeddings stored separately in ChromaDB):
+
+```
+data/ego_graphs/name/
+├── metadata.json           # Version and graph-level info
+├── self.json              # Ego node's semantic field
+├── connections/           # Individual files for each person
+│   ├── person1.json
+│   ├── person2.json
+│   └── ...
+├── edges.json            # All relationship edges
+└── contact_points.json   # Past/present/potential interactions
+```
+
+**metadata.json**:
 ```json
 {
   "version": "0.2",
-  "self": {
-    "id": "F",
-    "name": "Your Name",
-    "phrases": [...]
-  },
-  "connections": [
-    {
-      "id": "neighbor1",
-      "name": "Neighbor Name",
-      "phrases": [...],
-      "capabilities": ["skill1", "skill2"],
-      "availability": [
-        {"date": "2025-10-24", "score": 0.8, "content": "Generally available"}
-      ],
-      "notes": [
-        {"date": "2025-10-24", "content": "Met at conference, shared interest in X"}
-      ]
-    }
+  "format": "modular",
+  "created_at": "2025-10-24",
+  "description": "Ego graph for Your Name"
+}
+```
+
+**self.json**:
+```json
+{
+  "id": "your_id",
+  "name": "Your Name",
+  "phrases": [
+    {"text": "semantic navigation", "weight": 0.9, "last_updated": "2025-10-24"}
+  ]
+}
+```
+
+**connections/person.json**:
+```json
+{
+  "id": "person_id",
+  "name": "Person Name",
+  "phrases": [
+    {"text": "topic area", "weight": 0.8, "last_updated": "2025-10-24"}
   ],
-  "edges": [
-    {
-      "source": "F",
-      "target": "neighbor1",
-      "actual": 0.8,
-      "channels": ["video_calls", "in_person"]
-    }
+  "capabilities": ["skill1", "skill2"],
+  "availability": [
+    {"date": "2025-10-24", "score": 0.8, "content": "Generally available"}
   ],
-  "contact_points": {
-    "past": [
-      {"date": "2024-05", "people": ["F", "neighbor1"], "content": "Met at event X"}
-    ],
-    "present": [
-      {"people": ["F", "neighbor1"], "content": "Currently collaborating on Y"}
-    ],
-    "potential": [
-      {"people": ["F", "neighbor1"], "content": "Plan to work on Z together"}
-    ]
+  "notes": [
+    {"date": "2025-10-24", "content": "Met at conference, shared interest in X"}
+  ]
+}
+```
+
+**edges.json**:
+```json
+[
+  {
+    "source": "your_id",
+    "target": "person_id",
+    "actual": 0.8,
+    "channels": ["video_calls", "in_person"]
   }
+]
+```
+
+**contact_points.json**:
+```json
+{
+  "past": [
+    {"date": "2024-05", "people": ["your_id", "person_id"], "content": "Met at event X"}
+  ],
+  "present": [
+    {"people": ["your_id", "person_id"], "content": "Currently collaborating on Y"}
+  ],
+  "potential": [
+    {"people": ["your_id", "person_id"], "content": "Plan to work on Z together"}
+  ]
 }
 ```
 

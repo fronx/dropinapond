@@ -1,4 +1,9 @@
 # ego_ops.py
+"""
+Navigation metrics and analysis for ego graphs.
+
+For data loading, see storage.py.
+"""
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Iterable, Tuple, Optional
@@ -13,205 +18,8 @@ from scipy.stats import entropy as shannon_entropy
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 
-# ---------------------------
-# Core data structure
-# ---------------------------
-
-@dataclass
-class EgoData:
-    """
-    Local ego graph around focal node F.
-
-    nodes: list of node IDs including F and its neighbors (strings or ints).
-    focal: the ID of the focal node (e.g., "F").
-    embeddings: dict node_id -> np.ndarray of shape (d,)
-    edges: iterable of (u, v, dims) where dims is a dict with edge dimensions:
-           - 'potential': derived from embedding similarity (default)
-           - 'actual': real interaction strength (optional)
-           - 'past', 'present', 'future': temporal dimensions (optional)
-           Legacy format (u, v, w) or (u, v) also supported.
-    names: dict node_id -> human-readable name (optional)
-    """
-    nodes: List[str]
-    focal: str
-    embeddings: Dict[str, np.ndarray]
-    edges: Iterable[Tuple[str, str, Optional[float | Dict[str, float]]]]
-    names: Optional[Dict[str, str]] = None
-
-    def graph(self, edge_dim: str = 'potential') -> nx.Graph:
-        """
-        Build a NetworkX graph using the specified edge dimension.
-
-        edge_dim: which dimension to use for edge weights ('potential', 'actual', etc.)
-        """
-        G = nx.Graph()
-        for u in self.nodes:
-            G.add_node(u)
-        for e in self.edges:
-            if len(e) == 2:
-                u, v = e
-                w = 1.0
-                attrs = {}
-            else:
-                u, v, dims = e
-                if dims is None:
-                    w = 1.0
-                    attrs = {}
-                elif isinstance(dims, dict):
-                    w = dims.get(edge_dim, dims.get('potential', 1.0))
-                    # Preserve ALL edge attributes
-                    attrs = dims.copy()
-                else:
-                    w = float(dims)
-                    attrs = {}
-            if u in G and v in G:
-                G.add_edge(u, v, weight=float(w), **attrs)
-        return G
-
-    def Z(self, subset: Optional[Iterable[str]] = None) -> np.ndarray:
-        if subset is None:
-            subset = self.nodes
-        return np.stack([self.embeddings[n] for n in subset], axis=0)
-
-# ---------------------------
-# JSON loading
-# ---------------------------
-
-def load_ego_from_json(
-    filepath: str | Path,
-    embedding_service
-) -> EgoData:
-    """
-    Load ego graph from v0.2 JSON file.
-
-    Expected format:
-    {
-      "version": "0.2",
-      "self": {
-        "id": "F",
-        "name": "...",
-        "phrases": [
-          {"text": "...", "weight": 1.0, "last_updated": "2025-10-24"}
-        ]
-      },
-      "connections": [
-        {
-          "id": "neighbor1",
-          "name": "...",
-          "phrases": [...]
-        }
-      ],
-      "edges": [{"source": "F", "target": "neighbor1", "actual": 0.8}]
-    }
-
-    Embeddings are fetched from ChromaDB via embedding_service.
-
-    Args:
-        filepath: Path to JSON file
-        embedding_service: EmbeddingService instance (required)
-
-    Returns:
-        EgoData instance
-    """
-    with open(filepath) as f:
-        data = json.load(f)
-
-    if data.get("version") != "0.2":
-        raise ValueError(f"Only v0.2 format supported. Found version: {data.get('version')}")
-
-    filepath = Path(filepath)
-    if embedding_service is None:
-        raise ValueError(
-            "v0.2 format requires an EmbeddingService instance. "
-            "Import from src.embeddings and pass get_embedding_service()"
-        )
-
-    self_node = data["self"]
-    focal_id = self_node["id"]
-    connections_data = data.get("connections", [])
-    nodes_data = [self_node] + connections_data
-    edges_data = data.get("edges", [])
-
-    # Extract graph name from filepath
-    graph_name = Path(filepath).stem
-
-    # Process nodes and compute mean embeddings from phrases
-    nodes = []
-    embeddings = {}
-    names = {}
-
-    for node in nodes_data:
-        node_id = node["id"]
-        nodes.append(node_id)
-        names[node_id] = node.get("name", node_id)
-
-        phrases = node.get("phrases", [])
-        if not phrases:
-            # No phrases - use zero vector (edge case)
-            embeddings[node_id] = np.zeros(384)  # all-MiniLM-L6-v2 dimension
-            continue
-
-        # Extract phrase texts and weights
-        phrase_texts = [p["text"] for p in phrases]
-        weights = {
-            f"{node_id}:phrase_{i}": p.get("weight", 1.0)
-            for i, p in enumerate(phrases)
-        }
-
-        # Add phrases to ChromaDB if not already present
-        phrase_ids = [f"{node_id}:phrase_{i}" for i in range(len(phrase_texts))]
-
-        # Check if phrases already exist
-        try:
-            existing_embeddings = embedding_service.get_embeddings(graph_name, phrase_ids)
-            if len(existing_embeddings) != len(phrase_ids):
-                # Some missing, add them
-                embedding_service.add_phrases(
-                    graph_name=graph_name,
-                    node_id=node_id,
-                    phrases=phrase_texts,
-                    phrase_ids=phrase_ids
-                )
-        except:
-            # Add all phrases
-            embedding_service.add_phrases(
-                graph_name=graph_name,
-                node_id=node_id,
-                phrases=phrase_texts,
-                phrase_ids=phrase_ids
-            )
-
-        # Compute weighted mean embedding
-        mean_embedding = embedding_service.compute_mean_embedding(
-            graph_name=graph_name,
-            node_id=node_id,
-            weights=weights
-        )
-        embeddings[node_id] = mean_embedding
-
-    # Build edges from explicit edge list only
-    # Compute potential for all edges, but only include edges in the provided list
-    edge_dict = {}  # (u, v) -> dims dict
-
-    if edges_data:
-        for e in edges_data:
-            u, v = e["source"], e["target"]
-            key = tuple(sorted([u, v]))
-
-            # Compute potential from embeddings
-            cos_sim = max(0.0, _cos(embeddings[u], embeddings[v]))
-            dims = {"potential": cos_sim}
-
-            # Add any other dimensions (actual, etc.)
-            extra_dims = {k: val for k, val in e.items() if k not in ["source", "target"]}
-            dims.update(extra_dims)
-
-            edge_dict[key] = dims
-
-    # Convert to list format
-    edges = [(u, v, dims) for (u, v), dims in edge_dict.items()]
-
-    return EgoData(nodes=nodes, focal=focal_id, embeddings=embeddings, edges=edges, names=names)
+# Import EgoData and loading function from storage
+from storage import EgoData, load_ego_graph
 
 # ---------------------------
 # Utilities
@@ -882,10 +690,21 @@ def save_analysis_json(
         output_dir = Path(__file__).parent.parent / "data" / "analyses"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load ego graph version
-    with open(ego_graph_path) as f:
-        ego_graph_data = json.load(f)
-    ego_graph_version = ego_graph_data.get("version", "unknown")
+    ego_graph_path = Path(ego_graph_path)
+
+    # Load ego graph version (handle both modular directory and monolithic file)
+    if ego_graph_path.is_dir():
+        # Modular format - read from metadata.json
+        with open(ego_graph_path / "metadata.json") as f:
+            metadata = json.load(f)
+        ego_graph_version = metadata.get("version", "unknown")
+        ego_graph_name = ego_graph_path.name
+    else:
+        # Monolithic format - read from the JSON file
+        with open(ego_graph_path) as f:
+            ego_graph_data = json.load(f)
+        ego_graph_version = ego_graph_data.get("version", "unknown")
+        ego_graph_name = ego_graph_path.stem
 
     # Convert clusters from sets to sorted lists for JSON serialization
     clusters_serializable = [sorted(list(c)) for c in clusters]
@@ -930,9 +749,8 @@ def save_analysis_json(
         "recommendations": recommendations
     }
 
-    # Generate filename with timestamp
+    # Generate filename with timestamp (ego_graph_name already set above)
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    ego_graph_name = ego_graph_path.stem
     output_path = output_dir / f"{ego_graph_name}_{timestamp_str}.json"
 
     with open(output_path, 'w') as f:
@@ -953,12 +771,23 @@ if __name__ == "__main__":
         sys.exit(1)
 
     name = sys.argv[1]
-    fixture_path = Path(__file__).parent.parent / "data" / "ego_graphs" / f"{name}.json"
+    ego_graphs_dir = Path(__file__).parent.parent / "data" / "ego_graphs"
+
+    # Check for modular directory format
+    modular_path = ego_graphs_dir / name
 
     # Import and initialize embedding service
     from embeddings import get_embedding_service
     embedding_service = get_embedding_service()
-    ego = load_ego_from_json(fixture_path, embedding_service)
+
+    # Load from modular directory
+    if not modular_path.exists() or not modular_path.is_dir():
+        print(f"Error: Could not find ego graph directory at '{modular_path}'")
+        print(f"Expected modular format: data/ego_graphs/{name}/")
+        sys.exit(1)
+
+    ego = load_ego_graph(modular_path, embedding_service)
+    fixture_path = modular_path
 
     print(f"Loaded ego graph from: {fixture_path}\n")
 

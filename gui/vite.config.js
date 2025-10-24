@@ -8,5 +8,12 @@ export default defineConfig({
     fs: {
       allow: ['..'],
     },
+    watch: {
+      usePolling: true,
+      followSymlinks: true,
+    },
+  },
+  resolve: {
+    preserveSymlinks: false,
   },
 })

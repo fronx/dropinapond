@@ -19,17 +19,70 @@ function generateClusterColors(count) {
 const FOCAL_NODE_COLOR = '#777777';
 
 /**
- * Loads ego graph JSON data from the data directory
+ * Loads ego graph JSON data from the modular directory structure
  */
 export async function loadEgoGraph(name) {
   try {
-    // In development, we'll use Vite's dynamic import
-    // In production, you might need to serve the data directory differently
-    const response = await fetch(`/data/ego_graphs/${name}.json`);
-    if (!response.ok) {
-      throw new Error(`Failed to load ego graph: ${response.statusText}`);
+    // Load all files from the modular format
+    const basePath = `/data/ego_graphs/${name}`;
+
+    const [metadataRes, selfRes, edgesRes, contactPointsRes] = await Promise.all([
+      fetch(`${basePath}/metadata.json`),
+      fetch(`${basePath}/self.json`),
+      fetch(`${basePath}/edges.json`),
+      fetch(`${basePath}/contact_points.json`)
+    ]);
+
+    if (!metadataRes.ok) {
+      throw new Error(`Failed to load metadata.json: ${metadataRes.status} ${metadataRes.statusText}`);
     }
-    return await response.json();
+    if (!selfRes.ok) {
+      throw new Error(`Failed to load self.json: ${selfRes.status} ${selfRes.statusText}`);
+    }
+    if (!edgesRes.ok) {
+      throw new Error(`Failed to load edges.json: ${edgesRes.status} ${edgesRes.statusText}`);
+    }
+
+    const [metadata, self, edges, contactPoints] = await Promise.all([
+      metadataRes.json(),
+      selfRes.json(),
+      edgesRes.json(),
+      contactPointsRes.ok ? contactPointsRes.json() : { past: [], present: [], potential: [] }
+    ]);
+
+    // Extract connection IDs from edges (since we don't have a manifest file)
+    const uniqueIds = new Set();
+    edges.forEach(edge => {
+      if (edge.source !== self.id) uniqueIds.add(edge.source);
+      if (edge.target !== self.id) uniqueIds.add(edge.target);
+    });
+    const connectionIds = Array.from(uniqueIds);
+
+    // Load all connection files
+    const connections = await Promise.all(
+      connectionIds.map(async (id) => {
+        const res = await fetch(`${basePath}/connections/${id}.json`);
+        if (res.ok) {
+          return await res.json();
+        }
+        console.warn(`Could not load connection ${id}`);
+        return null;
+      })
+    );
+
+    // Filter out failed loads
+    const validConnections = connections.filter(c => c !== null);
+
+    // Reconstruct the ego graph format expected by the UI
+    return {
+      version: metadata.version,
+      format: metadata.format,
+      metadata,
+      self,
+      connections: validConnections,
+      edges,
+      contact_points: contactPoints
+    };
   } catch (error) {
     console.error(`Error loading ego graph "${name}":`, error);
     throw error;

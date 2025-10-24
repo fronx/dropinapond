@@ -61,54 +61,77 @@ As the conversation flows, extract structured information:
 
 ## File Operations Philosophy
 
-Update incrementally as the conversation flows. After each meaningful exchange where you learn something new, update the graph file.
+Update incrementally as the conversation flows. After each meaningful exchange where you learn something new, update the graph files.
 
-**Graph structure**:
-- All information lives in a single file: `data/ego_graphs/{name}.json`
-- Person-specific data: phrases, capabilities, availability, notes
-- Relational data: edges, contact_points (past/present/potential)
+**Graph structure (modular format)**:
+- Information is split across multiple files in `data/ego_graphs/{name}/`
+- `metadata.json` - Version and graph-level info
+- `self.json` - The user's own semantic field
+- `connections/{person_id}.json` - Individual files for each person
+- `edges.json` - All relationship edges
+- `contact_points.json` - Past/present/potential interactions
 
 **Natural workflow**:
 1. User mentions a person or topic
 2. Extract the relevant information
-3. Read the current JSON file
-4. Add/update the relevant information
-5. Write the updated JSON back
+3. Read the relevant file(s) (`self.json` or `connections/{person}.json`)
+4. Update the information
+5. Write back to the specific file
 6. Continue the conversation
 
-This keeps things manageable - you're not trying to remember everything at the end, and the user can see progress as you go.
+This modular approach makes it easier to edit individual people, see clean git diffs, and avoid overwhelming context windows.
 
 ### 1. Determine Graph Name
-Ask the user what to call their graph, or use their first name. This becomes the filename: `data/ego_graphs/{name}.json`
+Ask the user what to call their graph, or use their first name. This becomes the directory: `data/ego_graphs/{name}/`
 
 ### 2. Load or Create Graph
-- Check if `data/ego_graphs/{name}.json` exists
-- If yes: Read and parse it
-- If no: Create new graph with v0.2 schema:
+- Check if `data/ego_graphs/{name}/` directory exists
+- If yes: Read existing files
+- If no: Create new graph directory with v0.2 modular schema:
 
+**Create directory structure**:
+```bash
+mkdir -p data/ego_graphs/{name}/connections
+```
+
+**Create `metadata.json`**:
 ```json
 {
   "version": "0.2",
-  "focal_node": "F",
-  "metadata": {
-    "created_at": "2025-10-24",
-    "description": "Ego graph for {user_name}"
-  },
-  "nodes": [
-    {
-      "id": "F",
-      "name": "{user_name}",
-      "is_self": true,
-      "phrases": []
-    }
-  ],
-  "edges": []
+  "format": "modular",
+  "created_at": "2025-10-24",
+  "description": "Ego graph for {user_name}"
+}
+```
+
+**Create `self.json`**:
+```json
+{
+  "id": "{user_id}",
+  "name": "{user_name}",
+  "phrases": []
+}
+```
+
+**Create `edges.json`**:
+```json
+[]
+```
+
+**Create `contact_points.json`**:
+```json
+{
+  "past": [],
+  "present": [],
+  "potential": []
 }
 ```
 
 ### 3. Update Graph Incrementally
 
-**Adding/updating the focal node's phrases**:
+**Adding/updating the focal node's phrases** (update `self.json`):
+1. Read `data/ego_graphs/{name}/self.json`
+2. Add/update phrase in the `phrases` array:
 ```json
 {
   "text": "semantic navigation",
@@ -116,11 +139,13 @@ Ask the user what to call their graph, or use their first name. This becomes the
   "last_updated": "2025-10-24"
 }
 ```
+3. Write back to `self.json`
 
-**Adding a new person**:
+**Adding a new person** (create `connections/{person_id}.json`):
+1. Create `data/ego_graphs/{name}/connections/sarah.json` with:
 ```json
 {
-  "id": "S",
+  "id": "sarah",
   "name": "Sarah",
   "capabilities": ["urban planning", "community organizing"],
   "availability": [
@@ -136,51 +161,57 @@ Ask the user what to call their graph, or use their first name. This becomes the
 }
 ```
 
-**Adding/updating an edge**:
+**Updating an existing person** (edit `connections/{person_id}.json`):
+1. Read the existing `connections/{person_id}.json`
+2. Add new phrases, update notes/availability, etc.
+3. Write back to the same file
+
+**Adding/updating an edge** (update `edges.json`):
+1. Read `data/ego_graphs/{name}/edges.json`
+2. Add/update edge in the array:
 ```json
 {
-  "source": "F",
-  "target": "S",
+  "source": "fronx",
+  "target": "sarah",
   "actual": 0.7,
   "channels": ["video_calls", "in_person"]
 }
 ```
+3. Write back to `edges.json`
 
 ### 3.5. Update Contact Points
 
-For relational information like contact points (past events, current projects, future plans), add to the `contact_points` section in the main graph file:
+For relational information like contact points (past events, current projects, future plans), update the `contact_points.json` file:
 
-**Recording a past contact**:
+**Recording a past contact** (update `contact_points.json`):
+1. Read `data/ego_graphs/{name}/contact_points.json`
+2. Add to the `past` array:
 ```json
-"contact_points": {
-  "past": [
-    {
-      "date": "2024-05",
-      "people": ["F", "S", "J"],
-      "content": "Met Sarah at Justin's dinner party"
-    }
-  ]
+{
+  "date": "2024-05",
+  "people": ["fronx", "sarah", "justin"],
+  "content": "Met Sarah at Justin's dinner party"
 }
 ```
+3. Write back to `contact_points.json`
 
 **Recording a potential future interaction**:
+1. Read `contact_points.json`
+2. Add to the `potential` array:
 ```json
-"contact_points": {
-  "potential": [
-    {
-      "people": ["F", "S"],
-      "content": "Plan to collaborate on walkable cities project"
-    }
-  ]
+{
+  "people": ["fronx", "sarah"],
+  "content": "Plan to collaborate on walkable cities project"
 }
 ```
+3. Write back to `contact_points.json`
 
 The contact_points structure:
-- `contact_points.past`: Historical events, how people met, past projects
-- `contact_points.present`: Current active opportunities or ongoing interactions
-- `contact_points.potential`: Future plans, hopes for reconnection
+- `past`: Historical events, how people met, past projects
+- `present`: Current active opportunities or ongoing interactions
+- `potential`: Future plans, hopes for reconnection
 
-Always list all people involved in each contact point (including yourself as "F").
+Always use actual person IDs (not "F") - the focal node's ID is stored in `self.json`.
 
 ### 4. Run Analysis
 

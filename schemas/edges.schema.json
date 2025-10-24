@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://dropinapond.dev/schemas/edges.schema.json",
+  "title": "Edges Array",
+  "description": "Array of directed edges between people in the network",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["source", "target", "actual"],
+    "properties": {
+      "source": {
+        "type": "string",
+        "description": "Source node ID",
+        "minLength": 1
+      },
+      "target": {
+        "type": "string",
+        "description": "Target node ID",
+        "minLength": 1
+      },
+      "actual": {
+        "type": "number",
+        "description": "Actual interaction strength (0-1)",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "channels": {
+        "type": "array",
+        "description": "Communication channels used",
+        "items": {
+          "type": "string",
+          "enum": ["in_person", "video_calls", "voice_calls", "text_messages", "email", "telegram", "whatsapp", "signal", "discord", "slack", "twitter", "instagram", "facebook", "linkedin", "youtube"]
+        }
+      }
+    }
+  }
+}

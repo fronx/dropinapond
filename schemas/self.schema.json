@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://dropinapond.dev/schemas/self.schema.json",
+  "title": "Self Node",
+  "description": "The ego node's own semantic field",
+  "type": "object",
+  "required": ["id", "name", "phrases"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for this person",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "description": "Person's name",
+      "minLength": 1
+    },
+    "phrases": {
+      "type": "array",
+      "description": "Array of semantic phrases representing interests and expertise",
+      "items": {
+        "$ref": "phrase.schema.json"
+      }
+    }
+  }
+}

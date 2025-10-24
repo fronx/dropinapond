@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://dropinapond.dev/schemas/connection.schema.json",
+  "title": "Connection Node",
+  "description": "A person in the ego's network with predicted semantic field",
+  "type": "object",
+  "required": ["id", "name", "phrases"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for this person",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "description": "Person's name",
+      "minLength": 1
+    },
+    "phrases": {
+      "type": "array",
+      "description": "Predicted semantic field (what the ego thinks this person cares about)",
+      "items": {
+        "$ref": "phrase.schema.json"
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "Skills and expertise they can help with",
+      "items": {
+        "type": "string"
+      }
+    },
+    "availability": {
+      "type": "array",
+      "description": "Timestamped availability observations",
+      "items": {
+        "type": "object",
+        "required": ["date", "score", "content"],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "description": "Qualitative observations about the person",
+      "items": {
+        "type": "object",
+        "required": ["date", "content"],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional metadata about the node"
+    }
+  }
+}
