@@ -19,7 +19,10 @@ import matplotlib.pyplot as plt
 # Import EgoData and loading function from storage
 from storage import EgoData, load_ego_graph
 # Import clustering functions
-from clustering import ego_clusters, jaccard_overlap, tie_weight_entropy
+from clustering import (
+    ego_clusters, jaccard_overlap, tie_weight_entropy,
+    compute_kernel_neighborhoods, kernel_neighborhood_entropy, identify_bridge_nodes
+)
 
 # ---------------------------
 # Utilities
@@ -615,6 +618,7 @@ def save_analysis_json(
     scores: Dict[str, float],
     phrase_similarities: Optional[Dict[str, List[Dict]]] = None,
     orientation_score_breakdowns: Optional[Dict[str, Dict]] = None,
+    kernel_neighborhoods: Optional[Dict[str, Dict]] = None,
     output_dir: Optional[Path] = None,
     ego_data: Optional['EgoData'] = None
 ) -> Path:
@@ -696,7 +700,8 @@ def save_analysis_json(
             "per_neighbor_readability": r2_in_per_neighbor,
             "orientation_scores": scores,
             "orientation_score_breakdowns": orientation_score_breakdowns or {},
-            "phrase_similarities": phrase_similarities or {}
+            "phrase_similarities": phrase_similarities or {},
+            "kernel_neighborhoods": kernel_neighborhoods or {}
         },
         "recommendations": recommendations
     }
@@ -821,7 +826,52 @@ if __name__ == "__main__":
     best = max(scores, key=scores.__getitem__)
     print(f"\nBest next approach: {format_node(best)}")
 
-    # 7) Compute phrase-level semantic similarities for each neighbor
+    # 7) Kernel-based neighborhoods (continuous alternative to discrete clusters)
+    print("\n" + "="*70)
+    print("KERNEL-BASED NEIGHBORHOODS (continuous semantic regions)")
+    print("="*70)
+    kernel_weights = compute_kernel_neighborhoods(ego, bandwidth=None)
+    kernel_entropies = kernel_neighborhood_entropy(ego, kernel_weights)
+    bridge_nodes = identify_bridge_nodes(kernel_weights, threshold=0.3)
+
+    print(f"\nKernel bandwidth (auto-selected): {np.median([w for weights in kernel_weights.values() for w in weights.values() if 0 < w < 1]):.3f}" if kernel_weights else "N/A")
+
+    print(f"\nNeighborhood Entropy (how evenly distributed connections are):")
+    print("  High entropy = bridge/hub connecting many regions")
+    print("  Low entropy = cluster core, tightly connected to few neighbors")
+    sorted_entropies = sorted(kernel_entropies.items(), key=lambda x: x[1], reverse=True)
+    for i, (neighbor, entropy) in enumerate(sorted_entropies[:10], 1):
+        # Get top 3 strongest kernel connections for this neighbor
+        top_connections = sorted(
+            [(n, w) for n, w in kernel_weights[neighbor].items() if n != neighbor],
+            key=lambda x: x[1],
+            reverse=True
+        )[:3]
+        conn_str = ", ".join([f"{format_node(n).split(' (')[0]} ({w:.2f})" for n, w in top_connections])
+        print(f"  {i:2d}. {format_node(neighbor):30s} entropy={entropy:.3f}  top: {conn_str}")
+
+    if bridge_nodes:
+        print(f"\nBridge Nodes (connecting semantically distant neighbors):")
+        print("  These people connect regions that are otherwise dissimilar")
+        for i, bridge in enumerate(bridge_nodes[:8], 1):
+            # Get the dissimilar connections this bridge connects
+            strong_conns = [(n, kernel_weights[bridge][n]) for n in kernel_weights[bridge]
+                          if kernel_weights[bridge][n] >= 0.3 and n != bridge]
+            if len(strong_conns) >= 2:
+                # Find most dissimilar pair
+                max_dissim = 0.0
+                dissim_pair = None
+                for j, (n1, w1) in enumerate(strong_conns):
+                    for n2, w2 in strong_conns[j+1:]:
+                        dissim = 1.0 - kernel_weights.get(n1, {}).get(n2, 0.0)
+                        if dissim > max_dissim:
+                            max_dissim = dissim
+                            dissim_pair = (n1, n2)
+                if dissim_pair:
+                    print(f"  {i}. {format_node(bridge):30s} bridges {format_node(dissim_pair[0]).split(' (')[0]} ↔ {format_node(dissim_pair[1]).split(' (')[0]} (dissim={max_dissim:.2f})")
+    print("="*70)
+
+    # 8) Compute phrase-level semantic similarities for each neighbor
     print("\nComputing phrase similarities...")
     phrase_similarities = {}
     for j in neighbors:
@@ -835,6 +885,13 @@ if __name__ == "__main__":
         phrase_similarities[j] = similarities
         if similarities:
             print(f"  {format_node(j)}: {len(similarities)} semantic overlaps (top: {similarities[0]['similarity']:.2f})")
+
+    # Prepare kernel neighborhoods data for JSON export
+    kernel_data = {
+        "weights": kernel_weights,
+        "entropies": kernel_entropies,
+        "bridge_nodes": bridge_nodes
+    }
 
     # Save analysis to JSON
     analysis_path = save_analysis_json(
@@ -850,6 +907,7 @@ if __name__ == "__main__":
         scores=scores,
         phrase_similarities=phrase_similarities,
         orientation_score_breakdowns=score_breakdowns,
+        kernel_neighborhoods=kernel_data,
         ego_data=ego
     )
     print(f"\nAnalysis saved to: {analysis_path}")
