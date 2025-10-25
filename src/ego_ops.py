@@ -21,7 +21,8 @@ from storage import EgoData, load_ego_graph
 # Import clustering functions
 from clustering import (
     ego_clusters, jaccard_overlap, tie_weight_entropy,
-    compute_kernel_neighborhoods, kernel_neighborhood_entropy, identify_bridge_nodes
+    compute_kernel_neighborhoods, kernel_neighborhood_entropy, identify_bridge_nodes,
+    _row_stochastic_from_kernel, blanket_metrics_for_node
 )
 
 # ---------------------------
@@ -830,7 +831,31 @@ if __name__ == "__main__":
     print("\n" + "="*70)
     print("KERNEL-BASED NEIGHBORHOODS (continuous semantic regions)")
     print("="*70)
-    kernel_weights = compute_kernel_neighborhoods(ego, bandwidth=None)
+
+    # Calibrate tau for target effective neighbors
+    print("Calibrating kernel temperature (tau) for contrast...")
+    from clustering import calibrate_tau_for_target_effn
+    embeddings = {n: ego.embeddings[n] for n in neighbors}
+    tau = calibrate_tau_for_target_effn(
+        embeddings, target_effn=7.0, metric="cosine", k_sig=5, zero_diag=True
+    )
+    print(f"[Kernel] Calibrated tau={tau:.3f} for target effN≈7.0")
+
+    # Build kernel with calibrated tau
+    kernel_weights = compute_kernel_neighborhoods(
+        ego, metric="cosine", k_sig=5, tau=tau, zero_diag=True, keep_topk=None
+    )
+
+    # Diagnostics: print kernel weight distribution
+    ws = []
+    for ni, row in kernel_weights.items():
+        for nj, w in row.items():
+            if ni != nj:
+                ws.append(w)
+    ws = np.array(ws, dtype=float)
+    q = np.quantile(ws, [0.0, 0.25, 0.5, 0.75, 1.0])
+    print(f"[Kernel] weight quantiles -> min={q[0]:.3f}  q25={q[1]:.3f}  med={q[2]:.3f}  q75={q[3]:.3f}  max={q[4]:.3f}")
+
     kernel_entropies = kernel_neighborhood_entropy(ego, kernel_weights)
     bridge_nodes = identify_bridge_nodes(kernel_weights, threshold=0.3)
 
@@ -871,6 +896,136 @@ if __name__ == "__main__":
                     print(f"  {i}. {format_node(bridge):30s} bridges {format_node(dissim_pair[0]).split(' (')[0]} ↔ {format_node(dissim_pair[1]).split(' (')[0]} (dissim={max_dissim:.2f})")
     print("="*70)
 
+    # 7b) Diffusion & Markov-blanket view (continuous, no hard thresholds)
+    print("\n" + "="*70)
+    print("DIFFUSION / MARKOV-BLANKET METRICS")
+    print("="*70)
+
+    # Build Markov operator from kernel weights
+    P, P_nodes = _row_stochastic_from_kernel(kernel_weights)
+
+    # Small summary per neighbor in ego order
+    node_to_idx = {n: i for i, n in enumerate(P_nodes)}
+    # Use discrete powers mode with shorter times for better locality preservation
+    t_small = 1   # 1-step diffusion
+    t_big = 3     # 3-step diffusion
+    k_max = 6     # allow blanket sizes to vary more
+
+    print(f"\nComputing diffusion metrics (mode=powers, t_small={t_small}, t_big={t_big}, k_max={k_max})...")
+    diff_summary = {}
+    for j in neighbors:
+        if j not in node_to_idx:  # safety if neighbors list differs
+            continue
+        i = node_to_idx[j]
+        m = blanket_metrics_for_node(P, i, t_small=t_small, t_big=t_big, k_max=k_max, mode="powers")
+        diff_summary[j] = m
+
+    # Percentile-gated role classifier (exclusive, no contradictions)
+    def _kernel_strengths(kernel_weights: Dict[str, Dict[str, float]],
+                          nodes: List[str]) -> Dict[str, float]:
+        """Sum of off-diagonal kernel weights per row (pre-normalization signal)."""
+        strengths = {}
+        for ni in nodes:
+            row = kernel_weights.get(ni, {})
+            strengths[ni] = float(sum(w for nj, w in row.items() if nj != ni))
+        return strengths
+
+    def _quantiles(arr, ps=(0.25, 0.5, 0.75)):
+        """Compute quantiles for threshold gating."""
+        qs = np.quantile(np.asarray(arr, dtype=float), ps)
+        return {p: float(q) for p, q in zip(ps, qs)}
+
+    # Build arrays for thresholds
+    nodes_seq = list(diff_summary.keys())
+    delta = np.array([diff_summary[n]['delta_H2'] for n in nodes_seq], dtype=float)
+    ret   = np.array([diff_summary[n]['return_prob_k2'] for n in nodes_seq], dtype=float)
+    mse   = np.array([diff_summary[n]['blanket_mse'] for n in nodes_seq], dtype=float)
+    bridg = np.array([diff_summary[n]['bridgeyness'] for n in nodes_seq], dtype=float)
+
+    strengths = _kernel_strengths(kernel_weights, nodes_seq)
+    str_arr = np.array([strengths[n] for n in nodes_seq], dtype=float)
+
+    q_delta = _quantiles(delta)  # 25/50/75%
+    q_ret   = _quantiles(ret)
+    q_mse   = _quantiles(mse)
+    q_brid  = _quantiles(bridg)
+    q_str   = _quantiles(str_arr)
+
+    # Gates (simple, interpretable)
+    RET_HI    = q_ret[0.75]
+    RET_LO    = q_ret[0.25]
+    MSE_LO    = q_mse[0.25]
+    MSE_HI    = q_mse[0.75]
+    BRG_HI    = q_brid[0.75]
+    DELTA_MD  = q_delta[0.50]
+    DELTA_HI  = q_delta[0.75]  # "strong bridge" override
+    STR_LO    = q_str[0.25]
+
+    roles, reasons, tags = {}, {}, {}
+
+    for n in nodes_seq:
+        dH2 = diff_summary[n]['delta_H2']
+        rp2 = diff_summary[n]['return_prob_k2']
+        ems = diff_summary[n]['blanket_mse']
+        brg = diff_summary[n]['bridgeyness']
+        strg = strengths[n]
+
+        # Base gates
+        is_core    = (rp2 >= RET_HI) and (ems <= MSE_LO)
+        is_bridge  = (brg >= BRG_HI) and (dH2 >= DELTA_MD)
+        is_bridge_strong = (brg >= BRG_HI) and (dH2 >= DELTA_HI)   # strong override
+        is_isolated = (rp2 <= RET_LO) and ((ems >= MSE_HI) or (strg <= STR_LO))
+
+        # --- precedence: STRONG BRIDGE > core > (regular) bridge > isolated > even
+        if is_bridge_strong:
+            roles[n] = "bridge"
+            reasons[n] = f"very high bridgeyness (≥{BRG_HI:.3f}) and high ΔH₂ (≥{DELTA_HI:.3f})"
+        elif is_core:
+            roles[n] = "core"
+            reasons[n] = f"high ρ₂ (≥{RET_HI:.3f}) and low MSE (≤{MSE_LO:.4f})"
+        elif is_bridge:
+            roles[n] = "bridge"
+            reasons[n] = f"high bridgeyness (≥{BRG_HI:.3f}) and ΔH₂ ≥ median (≥{DELTA_MD:.3f})"
+        elif is_isolated:
+            roles[n] = "isolated"
+            reasons[n] = f"low ρ₂ (≤{RET_LO:.3f}) and (high MSE (≥{MSE_HI:.4f}) or low strength (≤{STR_LO:.4g}))"
+        else:
+            roles[n] = "even"
+            reasons[n] = "metrics in mid quantiles"
+
+        # Optional: multi-label tags so we don't lose nuance in the UI
+        lbls = []
+        if is_core: lbls.append("core")
+        if is_bridge: lbls.append("bridge")
+        if is_isolated: lbls.append("isolated")
+        tags[n] = lbls or ["even"]
+
+    # Pretty print by role
+    from collections import defaultdict
+    by_role = defaultdict(list)
+    for n in nodes_seq:
+        by_role[roles[n]].append(n)
+
+    print("\nRole classification (exclusive, bridge-first precedence):")
+    for r in ("core", "bridge", "isolated", "even"):
+        members = by_role.get(r, [])
+        if not members:
+            continue
+        print(f"  {r.upper()}:")
+        for n in members:
+            m = diff_summary[n]
+            print(f"    {format_node(n):28s} ΔH2={m['delta_H2']:.3f}  ρ₂={m['return_prob_k2']:.3f}  "
+                  f"MSE={m['blanket_mse']:.4f}  str={strengths[n]:.4g}  brg={m['bridgeyness']:.3f}  | {reasons[n]}")
+
+    # Sanity checks
+    print(f"\n[Sanity] role counts -> core:{len(by_role['core'])}  bridge:{len(by_role['bridge'])}  "
+          f"isolated:{len(by_role['isolated'])}  even:{len(by_role['even'])}")
+
+    print(f"[Thresholds] ρ₂: low≤{RET_LO:.3f} high≥{RET_HI:.3f} | MSE: low≤{MSE_LO:.4f} high≥{MSE_HI:.4f} | "
+          f"brg high≥{BRG_HI:.3f} | ΔH₂ median {DELTA_MD:.3f} / high {DELTA_HI:.3f}")
+
+    print("="*70)
+
     # 8) Compute phrase-level semantic similarities for each neighbor
     print("\nComputing phrase similarities...")
     phrase_similarities = {}
@@ -890,7 +1045,13 @@ if __name__ == "__main__":
     kernel_data = {
         "weights": kernel_weights,
         "entropies": kernel_entropies,
-        "bridge_nodes": bridge_nodes
+        "bridge_nodes": bridge_nodes,
+        "diffusion_blanket": {
+            "t_small": t_small,
+            "t_big": t_big,
+            "k_max": k_max,
+            "metrics": {n: {k: float(v) for k, v in diff_summary[n].items()} for n in diff_summary}
+        }
     }
 
     # Save analysis to JSON
