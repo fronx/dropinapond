@@ -14,12 +14,12 @@ from datetime import datetime
 import numpy as np
 import networkx as nx
 from scipy.linalg import expm
-from scipy.stats import entropy as shannon_entropy
-from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 
 # Import EgoData and loading function from storage
 from storage import EgoData, load_ego_graph
+# Import clustering functions
+from clustering import ego_clusters, jaccard_overlap, tie_weight_entropy
 
 # ---------------------------
 # Utilities
@@ -51,55 +51,7 @@ def _normalize(v: np.ndarray, eps: float = 1e-12) -> np.ndarray:
 # ---------------------------
 # 1) Ego picture: overlaps, clustering, attention entropy
 # ---------------------------
-
-def jaccard_overlap(G: nx.Graph, focal: str, j: str) -> float:
-    """
-    overlap_{Fj} = |N(F) ∩ N(j)| / |N(F) ∪ N(j)| on the ego set.
-    """
-    NF = set(G.neighbors(focal))
-    Nj = set(G.neighbors(j))
-    inter = len(NF & Nj)
-    uni = len(NF | Nj)
-    return 0.0 if uni == 0 else inter / uni
-
-def ego_clusters(G: nx.Graph, focal: str, method: str = "greedy") -> List[set]:
-    """
-    Cluster neighbors of F inside the ego graph (exclude F itself).
-    Returns a list of sets (node IDs) for clusters among N(F).
-    """
-    H = nx.Graph()
-    nbrs = [n for n in G.neighbors(focal)]
-    H.add_nodes_from(nbrs)
-    for u in nbrs:
-        for v in nbrs:
-            if u < v and G.has_edge(u, v):
-                H.add_edge(u, v, **G.get_edge_data(u, v))
-    if H.number_of_edges() == 0 or H.number_of_nodes() <= 2:
-        return [set(nbrs)] if nbrs else []
-    if method == "greedy":
-        comms = nx.algorithms.community.greedy_modularity_communities(H, weight="weight")
-        return [set(c) for c in comms]
-    else:
-        # fallback: 2-means on embeddings of neighbors using graph degree as a tie-breaker
-        # (only used if you switch method)
-        raise NotImplementedError
-
-def tie_weight_entropy(G: nx.Graph, focal: str, clusters: List[set]) -> float:
-    """
-    Entropy of attention/tie weights from F to clusters.
-    """
-    weights = []
-    for C in clusters:
-        wC = 0.0
-        for j in C:
-            if G.has_edge(focal, j):
-                wC += G[focal][j].get("weight", 1.0)
-        weights.append(wC)
-    w = np.array(weights, dtype=float)
-    if w.sum() <= 1e-12:
-        return 0.0
-    p = w / w.sum()
-    return float(shannon_entropy(p, base=2))
+# (Clustering functions now in clustering.py)
 
 # ---------------------------
 # 2) Public legibility (neighbors -> you)

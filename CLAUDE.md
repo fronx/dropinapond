@@ -76,9 +76,13 @@ The system computes six metrics to help navigate your network:
 - `EgoData` dataclass: Core data structure for ego graphs
 - `load_ego_graph()`: Load from modular directory structure
 
+**src/clustering.py**: Clustering algorithms for ego graph neighbors
+- `ego_clusters()`: Cluster neighbors using greedy modularity maximization
+- `jaccard_overlap()`: Compute structural overlap between neighborhoods
+- `tie_weight_entropy()`: Measure attention distribution across clusters
+
 **src/ego_ops.py**: Navigation metrics and analysis
 - Utility functions (cosine similarity, normalization, R² metrics)
-- Semantic landscape picture: `ego_clusters()` for cluster detection
 - Public legibility: `public_legibility_r2()` for ridge regression reconstruction
 - Subjective attunement: `subjective_attunement_r2()` (includes gated rank-2 variant)
 - Heat-residual novelty: `heat_residual_norm()` for diffusion on graph Laplacian
