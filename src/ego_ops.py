@@ -1024,6 +1024,36 @@ if __name__ == "__main__":
     print(f"[Thresholds] ρ₂: low≤{RET_LO:.3f} high≥{RET_HI:.3f} | MSE: low≤{MSE_LO:.4f} high≥{MSE_HI:.4f} | "
           f"brg high≥{BRG_HI:.3f} | ΔH₂ median {DELTA_MD:.3f} / high {DELTA_HI:.3f}")
 
+    # Compute diffusion matrices at multiple time scales for visualization
+    print(f"\nComputing diffusion matrices for heatmap visualization...")
+    P1 = P  # 1-step (already have this)
+    P2 = P @ P  # 2-step
+    P3 = P @ P @ P  # 3-step
+
+    # Build diffusion heatmap data structure for export
+    diffusion_heatmap = {
+        "node_order": P_nodes,  # List of node IDs in matrix order
+        "node_names": [format_node(n).split(' (')[0] for n in P_nodes],  # Human-readable names
+        "roles": {n: roles.get(n, "even") for n in P_nodes},  # Role for each node
+        "matrices": {
+            "t1": P1.tolist(),  # 1-step diffusion
+            "t2": P2.tolist(),  # 2-step diffusion
+            "t3": P3.tolist(),  # 3-step diffusion
+        },
+        "node_metrics": {
+            n: {
+                "delta_H2": float(diff_summary[n]['delta_H2']),
+                "return_prob_k2": float(diff_summary[n]['return_prob_k2']),
+                "blanket_mse": float(diff_summary[n]['blanket_mse']),
+                "bridgeyness": float(diff_summary[n]['bridgeyness']),
+                "strength": float(strengths[n]),
+                "role": roles.get(n, "even"),
+                "role_tags": tags.get(n, ["even"])
+            }
+            for n in P_nodes if n in diff_summary
+        }
+    }
+
     print("="*70)
 
     # 8) Compute phrase-level semantic similarities for each neighbor
@@ -1051,7 +1081,8 @@ if __name__ == "__main__":
             "t_big": t_big,
             "k_max": k_max,
             "metrics": {n: {k: float(v) for k, v in diff_summary[n].items()} for n in diff_summary}
-        }
+        },
+        "diffusion_heatmap": diffusion_heatmap
     }
 
     # Save analysis to JSON
