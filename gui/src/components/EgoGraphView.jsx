@@ -211,7 +211,7 @@ export function EgoGraphView() {
         gap: '0.75rem',
         alignItems: 'center'
       }}>
-        <button
+        {/* <button
           onClick={() => setShowDiffusion(!showDiffusion)}
           disabled={!diffusionData}
           style={{
@@ -227,7 +227,7 @@ export function EgoGraphView() {
           }}
         >
           {showDiffusion ? '✓ ' : ''}Show Diffusion Flow
-        </button>
+        </button> */}
 
         {showDiffusion && (
           <>
