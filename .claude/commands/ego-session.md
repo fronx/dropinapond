@@ -30,6 +30,7 @@ Be **warm, curious, and natural**. This should feel like a thoughtful conversati
 - Interaction context (strength, recency, quality)
 - Emotional tone (indicates relationship strength)
 - Bridge opportunities ("X introduced me to Y")
+- **Shared characteristics**: When the user describes shared traits, qualities, or ways of thinking with another person, add these to BOTH the other person's phrases AND the user's own phrases in self.json
 
 ## Data Extraction
 
