@@ -2,31 +2,41 @@
 
 This analysis combines two sources of information about your network: who you actually interact with and who thinks and talks about similar things as you.
 
-To measure "thinking about similar things," we represent each person's semantic field as a cloud of points in a high-dimensional space organized by meaning—phrases that mean similar things sit closer together. Your semantic field is the collection of topics and ideas you care about, scattered through this space. When your cloud overlaps substantially with someone else's, you share conceptual territory.
+To measure "thinking about similar things," we represent each person's interests as a collection of **phrases**. Each phrase gets converted into a numeric vector (embedding) that captures its meaning:
 
-We can measure this overlap numerically: for any pair of people, we compute how much their phrase clouds align. This gives us a semantic affinity score for each potential connection. We then blend these affinity scores with your actual interaction strengths to create a combined network.
+```json
+{
+  "consciousness exploration":     [0.23, -0.15, 0.89, "...", 0.42],
+  "watching math videos for fun":  [0.11, 0.67, -0.22, "...", 0.38],
+  "dinosaurs":                     [-0.45, 0.12, 0.56, "...", -0.19],
+  "topological network analysis":  [0.34, -0.21, 0.73, "...", 0.51]
+}
+```
+
+Semantically similar phrases end up with similar vectors (close together in this high-dimensional space). Your **semantic field** is the collection of all your phrase vectors—a cloud of points scattered through the embedding space.
+
+When two people's **phrase clouds** overlap substantially—meaning they have many phrases that are semantically close—they share conceptual territory. We can measure this overlap numerically to compute a **semantic affinity** score between any pair of people. We then blend these affinity scores with your actual interaction strengths to create a combined network.
 
 The result is a graph where edge weights reflect both real relationships and conceptual alignment. This reveals where information is likely to flow, which clusters form around shared meaning, and where high-affinity connections don't exist yet.
 
 ---
 
-## 1. Concept
+## 1. Mathematical Model
 
-### Intuition
+We need a way to assign a weight to each connection that combines both interaction strength and semantic alignment.
 
-Standard network analysis treats connections as binary facts: you're linked or you're not. But some people you rarely speak to might be working on exactly the problems you care about. Others you talk to frequently might occupy completely different semantic worlds.
+To do that, we represent your network as a matrix where each row is a person, each column is a person, and entry \( W_{ij} \) is the effective connection strength from person \( i \) to person \( j \).
 
-This analysis addresses the gap by computing two separate weight matrices—one from actual edges, one from semantic affinity—and blending them. The result is a composite network that captures both who you interact with and who thinks like you.
-
-### Mathematical Model
+We construct \( W \) by blending two matrices:
 
 \[
 W = \alpha S + (1 - \alpha) A
 \]
 
 where:
-- \( S \) = structural weights from actual edges
-- \( A \) = semantic affinities from phrase embeddings
+- \( W \) = blended weight matrix (effective connection strengths)
+- \( S \) = structural weight matrix (from actual edges)
+- \( A \) = semantic affinity matrix (from phrase embeddings)
 - \( \alpha \in [0,1] \) = blending parameter
 
 At \( \alpha = 1 \), you get pure topology. At \( \alpha = 0 \), pure semantics. In between, you get both.
@@ -37,7 +47,10 @@ At \( \alpha = 1 \), you get pure topology. At \( \alpha = 0 \), pure semantics.
 
 ### Intuition
 
-We construct \( S \) from your actual edges, \( A \) from pairwise phrase-level semantic similarity, and blend them according to \( \alpha \).
+We build the blended matrix \( W \) in three steps:
+1. Construct \( S \) (structural matrix) from your actual interaction edges
+2. Compute \( A \) (affinity matrix) from pairwise phrase-level semantic similarity
+3. Blend them according to \( \alpha \)
 
 ### Technical Details
 
@@ -47,22 +60,18 @@ Read structural edges from `edges.json` and fetch phrase embeddings from ChromaD
 
 #### 2.2 Structural weights (\( S \))
 
-\( S_{ij} \) is the edge's `actual` field, normalized and clipped to \([0,1]\).
+\( S_{ij} \) is the edge's `actual` field (defaults to 0.3 if missing), clipped to \([0,1]\).
 
 #### 2.3 Semantic affinities (\( A \))
 
-For each directed edge \( i \to j \):
+For each existing directed edge \( i \to j \) (we compute affinities only where edges already exist to keep the graph structure intact):
 
 1. Retrieve phrase embeddings for both nodes
-2. Compute weighted mean of pairwise cosine similarities:
+2. Compute all pairwise cosine similarities between phrases from \( i \) and phrases from \( j \)
+3. Filter out pairs with similarity below `--cos-min` (default 0.2)
+4. Take the weighted mean of the remaining similarities (each pair weighted by the product of its phrase weights)
 
-\[
-A_{ij} = \text{mean}_{p \in i, q \in j} \left(\max(0, \cos(p,q))\right)
-\]
-
-weighted by phrase weights.
-
-3. Filter out affinities below `--cos-min` (default 0.2)
+This quantifies how much the two phrase clouds overlap.
 
 #### 2.4 Blend (\( W \))
 
@@ -86,13 +95,13 @@ With \( W \) in hand, we can simulate diffusion (attention flow), detect communi
 
 #### 3.1 Diffusion Simulation
 
-Normalize \( W \) to make it row-stochastic:
+To simulate how attention or information flows through the network, we need to convert weights into probabilities. We normalize each row of \( W \) so it sums to 1:
 
 \[
 P = \frac{W}{\text{row-sum}(W)}
 \]
 
-\( P \) is a Markov transition matrix: \( P_{ij} \) is the probability that attention flows from \( i \) to \( j \) in one step.
+Now \( P_{ij} \) represents the probability that attention flows from \( i \) to \( j \) in one step (row-stochastic matrix).
 
 We compute and export:
 - \( P^1 \) (1-step diffusion)
@@ -103,13 +112,13 @@ The UI's "Show Diffusion Flow" overlay uses these matrices to visualize where in
 
 #### 3.2 Clustering (community detection)
 
-Symmetrize \( W \):
+Most clustering algorithms expect undirected graphs. We symmetrize the weight matrix by summing:
 
 \[
 W_{undirected} = W + W^\top
 \]
 
-Run greedy modularity maximization to partition nodes into clusters.
+Then run greedy modularity maximization to partition nodes into clusters.
 
 Clusters reflect combined semantic and structural coherence—people who are both connected and aligned. Boundary nodes sit between semantically distinct regions.
 
@@ -117,7 +126,7 @@ Clusters reflect combined semantic and structural coherence—people who are bot
 
 Find pairs with no edge but high semantic affinity:
 
-1. Compute affinities for all non-edges (using mean embeddings as a fast approximation)
+1. For all non-edges, compute affinities between phrase clouds. (For speed, we use each person's average embedding rather than full phrase-by-phrase comparison)
 2. Rank by affinity
 3. Export top `--suggest-k` per node
 
@@ -136,7 +145,7 @@ These are potential bridges—people whose ideas align but who aren't yet connec
 
 ## 4. Output Structure
 
-All results are written to `data/analyses/<name>_latest.json`:
+All results are written to `data/analyses/<name>_latest.json`. The structure separates raw inputs (structural edges, semantic affinities) from derived outputs (effective weights, clusters, diffusion):
 
 ```json
 {
@@ -165,26 +174,28 @@ All results are written to `data/analyses/<name>_latest.json`:
 }
 ```
 
+The `layers` object preserves both input matrices (`structural_edges`, `semantic_affinity`) and the blended result (`effective_edges`), making it easy to compare them. The `kernel_neighborhoods.diffusion_heatmap` holds the \( P^t \) matrices (historical naming from an earlier version of the system).
+
 ---
 
 ## 5. UI Interpretation
 
-| Visual Element   | Data Source                                | Meaning                                         |
-|------------------|--------------------------------------------|-------------------------------------------------|
-| Node color       | `metrics.clusters`                         | Cluster membership (semantic + structural) |
-| Edge thickness   | `metrics.layers.effective_edges`       | Blended weight (\( W \)) |
-| Diffusion overlay| `metrics.kernel_neighborhoods.diffusion_heatmap` | \( P^t \) matrices showing attention flow |
-| Suggestions      | `recommendations.semantic_suggestions`       | High-affinity non-edges              |
+| Visual Element    | Data Source                                      | Meaning                                    |
+| ----------------- | ------------------------------------------------ | ------------------------------------------ |
+| Node color        | `metrics.clusters`                               | Cluster membership (semantic + structural) |
+| Edge thickness    | `metrics.layers.effective_edges`                 | Blended weight (\( W \))                   |
+| Diffusion overlay | `metrics.kernel_neighborhoods.diffusion_heatmap` | \( P^t \) matrices showing attention flow  |
+| Suggestions       | `recommendations.semantic_suggestions`           | High-affinity non-edges                    |
 
 ---
 
 ## 6. Tuning Parameters
 
-| Parameter   | Effect                                | Typical Range  |
-|-------------|-------------------------------------|----------------|
-| `--alpha`     | Structure vs. semantics | 0.4–0.8    |
-| `--cos-min`   | Min similarity threshold | 0.15–0.3   |
-| `--suggest-k` | Max suggestions per node | 2–5     |
+| Parameter     | Effect                   | Typical Range |
+| ------------- | ------------------------ | ------------- |
+| `--alpha`     | Structure vs. semantics  | 0.4–0.8       |
+| `--cos-min`   | Min similarity threshold | 0.15–0.3      |
+| `--suggest-k` | Max suggestions per node | 2–5           |
 
 Low \( \alpha \) emphasizes semantic affinity. High \( \alpha \) preserves topology. Run multiple analyses to see how clusters shift.
 
