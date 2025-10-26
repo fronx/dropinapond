@@ -1,6 +1,12 @@
 # Semantic–Structural Flow Analysis
 
-Imagine a network not just as dots connected by lines, but as a living web where ideas, meanings, and attention flow like currents through rivers. Each connection carries not only the fact of interaction but also a resonance of shared understanding and themes. This analysis captures that dynamic interplay — how information and influence ripple through the network’s structure, shaped by both who talks to whom and what they talk about. It reveals hidden pathways where meaning spreads naturally, and communities form not just by links, but by shared semantic harmony.
+This analysis combines two sources of information about your network: who you actually interact with and who thinks and talks about similar things as you.
+
+To measure "thinking about similar things," we represent each person's semantic field as a cloud of points in a high-dimensional space organized by meaning—phrases that mean similar things sit closer together. Your semantic field is the collection of topics and ideas you care about, scattered through this space. When your cloud overlaps substantially with someone else's, you share conceptual territory.
+
+We can measure this overlap numerically: for any pair of people, we compute how much their phrase clouds align. This gives us a semantic affinity score for each potential connection. We then blend these affinity scores with your actual interaction strengths to create a combined network.
+
+The result is a graph where edge weights reflect both real relationships and conceptual alignment. This reveals where information is likely to flow, which clusters form around shared meaning, and where high-affinity connections don't exist yet.
 
 ---
 
@@ -8,25 +14,22 @@ Imagine a network not just as dots connected by lines, but as a living web where
 
 ### Intuition
 
-Traditional social network analysis looks at who interacts with whom — the concrete, factual connections that tie people together. But human relationships are richer than mere contact; they carry layers of meaning and shared ideas. Imagine two people who may rarely speak but think along similar lines, their minds resonating like tuning forks. Capturing this semantic harmony alongside structural ties lets us see not only the skeleton of the network but also its living pulse.
+Standard network analysis treats connections as binary facts: you're linked or you're not. But some people you rarely speak to might be working on exactly the problems you care about. Others you talk to frequently might occupy completely different semantic worlds.
 
-The Semantic–Structural Flow analysis blends these two realities into a single picture — a network where edges reflect both actual relationships and the strength of shared meaning. This combined view lets us simulate how attention flows, discover communities bound by both connection and concept, and suggest new links where ideas align but ties have yet to form.
+This analysis addresses the gap by computing two separate weight matrices—one from actual edges, one from semantic affinity—and blending them. The result is a composite network that captures both who you interact with and who thinks like you.
 
 ### Mathematical Model
-
-The combined network weight matrix \( W \) is a blend of:
 
 \[
 W = \alpha S + (1 - \alpha) A
 \]
 
-where
+where:
+- \( S \) = structural weights from actual edges
+- \( A \) = semantic affinities from phrase embeddings
+- \( \alpha \in [0,1] \) = blending parameter
 
-- \( S \) = structural weights from actual edges  
-- \( A \) = semantic affinities derived from phrase embeddings  
-- \( \alpha \in [0,1] \) = blending factor controlling the balance
-
-This formula produces an effective weighted graph that expresses both existing topology and semantic conductance.
+At \( \alpha = 1 \), you get pure topology. At \( \alpha = 0 \), pure semantics. In between, you get both.
 
 ---
 
@@ -34,47 +37,42 @@ This formula produces an effective weighted graph that expresses both existing t
 
 ### Intuition
 
-To build this blended network, we start with the known connections — who talks to whom and how strongly. Then, we enrich those links with semantic information, measuring how closely aligned people's ideas are by comparing their phrase embeddings. By combining these, we create a nuanced map where edges carry both factual and conceptual weight.
+We construct \( S \) from your actual edges, \( A \) from pairwise phrase-level semantic similarity, and blend them according to \( \alpha \).
 
 ### Technical Details
 
 #### 2.1 Load ego graph
 
-We read:
-
-- Structural edges from `/data/ego_graphs/<name>/edges.json`  
-- Each person’s phrases and embeddings via ChromaDB through `embeddings.get_embedding_service()`.
+Read structural edges from `edges.json` and fetch phrase embeddings from ChromaDB.
 
 #### 2.2 Structural weights (\( S \))
 
-Matrix \( S_{ij} \) represents the normalized connection strength from node *i* to *j*, based on `edge["actual"]`, clipped to the range \([0,1]\).
+\( S_{ij} \) is the edge's `actual` field, normalized and clipped to \([0,1]\).
 
 #### 2.3 Semantic affinities (\( A \))
 
-For each existing directed edge:
+For each directed edge \( i \to j \):
 
-1. Collect phrase embeddings for source and target nodes.  
-2. Compute a weighted cosine similarity between their phrases:
+1. Retrieve phrase embeddings for both nodes
+2. Compute weighted mean of pairwise cosine similarities:
 
 \[
-A_{ij} = \text{mean}_{p \in i, q \in j} \left(\max(0, \cos(p,q))\right) \text{ weighted by phrase weights}
+A_{ij} = \text{mean}_{p \in i, q \in j} \left(\max(0, \cos(p,q))\right)
 \]
 
-3. Ignore weak similarities below the threshold `--cos-min` (default 0.2).
+weighted by phrase weights.
 
-This quantifies how semantically aligned two people’s conceptual fields are.
+3. Filter out affinities below `--cos-min` (default 0.2)
 
-#### 2.4 Blending: effective weights (\( W \))
-
-The final weight matrix is:
+#### 2.4 Blend (\( W \))
 
 \[
 W = \alpha S + (1 - \alpha) A
 \]
 
-- `--alpha 1.0` yields purely structural weights  
-- `--alpha 0.0` yields purely semantic weights (along existing edges)  
-- Intermediate values mix both.
+- `--alpha 1.0`: ignore semantics, use pure topology
+- `--alpha 0.0`: ignore topology, use pure semantic affinity
+- Intermediate values combine both
 
 ---
 
@@ -82,75 +80,63 @@ W = \alpha S + (1 - \alpha) A
 
 ### Intuition
 
-With this blended network, we can explore how ideas and attention might flow, how communities emerge, and where new connections could form. The analysis simulates diffusion — like watching a drop of ink spread through water — revealing paths of influence. It also detects clusters where semantic and structural ties reinforce each other, and suggests promising new edges where semantic affinity is high but no link exists.
+With \( W \) in hand, we can simulate diffusion (attention flow), detect communities that reflect both structure and semantics, and identify high-affinity pairs with no existing edge.
 
 ### Technical Details
 
 #### 3.1 Diffusion Simulation
 
-We convert the effective weights \( W \) into a row-stochastic matrix:
+Normalize \( W \) to make it row-stochastic:
 
 \[
 P = \frac{W}{\text{row-sum}(W)}
 \]
 
-This matrix \( P \) acts as a Markov transition operator, representing the probability that attention flows from one node to another in a single step.
+\( P \) is a Markov transition matrix: \( P_{ij} \) is the probability that attention flows from \( i \) to \( j \) in one step.
 
-We export:
+We compute and export:
+- \( P^1 \) (1-step diffusion)
+- \( P^2 \) (2-step diffusion)
+- \( P^3 \) (3-step diffusion)
 
-- \( t1 = P \)  
-- \( t2 = P^2 \)  
-- \( t3 = P^3 \)
-
-These represent 1-, 2-, and 3-step diffusion snapshots, used by the “Show Diffusion Flow” overlay in the UI.
-
-Interpretation:  
-- Thick arrows indicate strong potential for information flow.  
-- Increasing \( t \) shows how ideas spread indirectly across the network.
+The UI's "Show Diffusion Flow" overlay uses these matrices to visualize where information spreads—directly or through intermediaries.
 
 #### 3.2 Clustering (community detection)
 
-We symmetrize the weights to create an undirected graph:
+Symmetrize \( W \):
 
 \[
 W_{undirected} = W + W^\top
 \]
 
-Then, we run greedy modularity optimization on this graph.
+Run greedy modularity maximization to partition nodes into clusters.
 
-- The algorithm groups nodes with dense, semantically informed connections.  
-- Clusters represent regions of high combined semantic and structural coherence.
-
-Interpretation:  
-- High-coherence clusters are groups of people both connected and semantically resonant.  
-- Boundary nodes link otherwise distinct semantic regions.
+Clusters reflect combined semantic and structural coherence—people who are both connected and aligned. Boundary nodes sit between semantically distinct regions.
 
 #### 3.3 Connection suggestions
 
-We identify high-affinity non-edges by:
+Find pairs with no edge but high semantic affinity:
 
-- Finding pairs of nodes without existing edges.  
-- Ranking them by semantic affinity (using mean embeddings as a fast pre-filter).  
-- Exporting the top `--suggest-k` per node as:
+1. Compute affinities for all non-edges (using mean embeddings as a fast approximation)
+2. Rank by affinity
+3. Export top `--suggest-k` per node
 
+Output format:
 ```json
-"recommendations": { "semantic_suggestions": [ { "source": ..., "target": ..., "affinity": ... } ] }
+"recommendations": {
+  "semantic_suggestions": [
+    { "source": "...", "target": "...", "affinity": 0.89 }
+  ]
+}
 ```
 
-Interpretation:  
-- These suggestions highlight potential bridges — people not yet connected but with highly compatible ideas.
+These are potential bridges—people whose ideas align but who aren't yet connected.
 
 ---
 
 ## 4. Output Structure
 
-### Intuition
-
-The output organizes the analysis into a structured format that the EgoGraph UI can use to visualize clusters, edge strengths, diffusion flows, and recommendations. It captures the blended reality of the network, ready for exploration.
-
-### Technical Details
-
-Example outline of `data/analyses/<name>_latest.json`:
+All results are written to `data/analyses/<name>_latest.json`:
 
 ```json
 {
@@ -181,47 +167,31 @@ Example outline of `data/analyses/<name>_latest.json`:
 
 ---
 
-## 5. Interpreting Results in the UI
-
-### Intuition
-
-The UI translates these metrics into visual cues that help users grasp the network’s semantic-structural dynamics at a glance. Colors, thickness, and overlays reveal communities, connection strengths, and potential new links, making the abstract analysis tangible.
+## 5. UI Interpretation
 
 | Visual Element   | Data Source                                | Meaning                                         |
 |------------------|--------------------------------------------|-------------------------------------------------|
-| Node color       | `metrics.clusters`                         | Membership in a semantically-structurally coherent region |
-| Edge thickness / brightness | `metrics.layers.effective_edges`       | Blended strength of factual + semantic connection |
-| Diffusion overlay| `metrics.kernel_neighborhoods.diffusion_heatmap` | Simulated potential information flow            |
-| Suggestions (future) | `recommendations.semantic_suggestions`       | Potential new edges worth exploring              |
+| Node color       | `metrics.clusters`                         | Cluster membership (semantic + structural) |
+| Edge thickness   | `metrics.layers.effective_edges`       | Blended weight (\( W \)) |
+| Diffusion overlay| `metrics.kernel_neighborhoods.diffusion_heatmap` | \( P^t \) matrices showing attention flow |
+| Suggestions      | `recommendations.semantic_suggestions`       | High-affinity non-edges              |
 
 ---
 
 ## 6. Tuning Parameters
 
-### Intuition
-
-Adjusting parameters lets you explore different balances between structure and semantics, and control sensitivity thresholds. This tuning reveals how the network’s character shifts — from topology-driven to meaning-driven — and helps tailor the analysis to your needs.
-
 | Parameter   | Effect                                | Typical Range  |
 |-------------|-------------------------------------|----------------|
-| --alpha     | Balance between structure and semantics | 0.4 – 0.8    |
-| --cos-min   | Similarity threshold for phrase pairs | 0.15 – 0.3   |
-| --suggest-k | How many high-affinity non-edges to suggest | 2 – 5     |
+| `--alpha`     | Structure vs. semantics | 0.4–0.8    |
+| `--cos-min`   | Min similarity threshold | 0.15–0.3   |
+| `--suggest-k` | Max suggestions per node | 2–5     |
 
-Low alpha → semantic clustering dominates.  
-High alpha → original topology dominates.  
-Use several runs to observe how clusters and diffusion change.
+Low \( \alpha \) emphasizes semantic affinity. High \( \alpha \) preserves topology. Run multiple analyses to see how clusters shift.
 
 ---
 
 ## 7. Key Takeaway
 
-### Intuition
+Standard network analysis asks "who's connected?" This analysis asks "who's connected *and* who thinks alike?"
 
-This analysis reveals that communities are not just about who talks to whom, but also about who shares meaning. By reshaping the graph with semantic information, it uncovers clusters and pathways where ideas flow naturally — bridging the gap between social structure and shared understanding.
-
-The network becomes a map of both connections and concepts, showing where meaning can travel most freely.
-
----
-
-Would you like me to add one more section at the end showing **example before/after diagrams** (schematic graphs showing how semantic blending changes cluster boundaries)? That could make it even easier for future readers to grasp visually.
+By blending structural and semantic layers, we see clusters that reflect actual communities of practice—not just interaction patterns—and we surface high-value connections that don't exist yet.
