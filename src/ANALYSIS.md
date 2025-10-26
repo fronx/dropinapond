@@ -45,9 +45,7 @@ At \( \alpha = 1 \), you get pure topology. At \( \alpha = 0 \), pure semantics.
 
 ## 2. Processing Stages
 
-### Intuition
-
-We build the blended matrix \( W \) in three steps:
+How do we actually build S, A, and W?
 1. Construct \( S \) (structural matrix) from your actual interaction edges
 2. Compute \( A \) (affinity matrix) from pairwise phrase-level semantic similarity
 3. Blend them according to \( \alpha \)
@@ -64,7 +62,9 @@ Read structural edges from `edges.json` and fetch phrase embeddings from ChromaD
 
 #### 2.3 Semantic affinities (\( A \))
 
-For each existing directed edge \( i \to j \) (we compute affinities only where edges already exist to keep the graph structure intact):
+For the affinity matrix \( A \), we compute affinities only along existing directed edges \( i \to j \). This keeps the graph structure intact—we're re-weighting existing connections, not creating new ones yet. (Later, in connection suggestions, we'll look beyond existing edges.)
+
+For each existing edge:
 
 1. Retrieve phrase embeddings for both nodes
 2. Compute all pairwise cosine similarities between phrases from \( i \) and phrases from \( j \)
@@ -95,7 +95,9 @@ With \( W \) in hand, we can simulate diffusion (attention flow), detect communi
 
 #### 3.1 Diffusion Simulation
 
-To simulate how attention or information flows through the network, we need to convert weights into probabilities. We normalize each row of \( W \) so it sums to 1:
+Once we have these blended weights, we can model how attention ripples through the network—more likely to flow between people who are both connected and conceptually close.
+
+To simulate this, we convert weights into probabilities. We normalize each row of \( W \) so it sums to 1:
 
 \[
 P = \frac{W}{\text{row-sum}(W)}
