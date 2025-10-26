@@ -159,14 +159,17 @@ def load_ego_graph(
             continue
 
         # Extract phrase texts and weights
+        # Use content-based IDs (hash of text) so changes to phrase text are detected
+        import hashlib
         phrase_texts = [p["text"] for p in phrases]
+        phrase_ids = [
+            f"{node_id}:{hashlib.sha256(text.encode()).hexdigest()[:16]}"
+            for text in phrase_texts
+        ]
         weights = {
-            f"{node_id}:phrase_{i}": p.get("weight", 1.0)
+            phrase_ids[i]: p.get("weight", 1.0)
             for i, p in enumerate(phrases)
         }
-
-        # Add phrases to ChromaDB if not already present
-        phrase_ids = [f"{node_id}:phrase_{i}" for i in range(len(phrase_texts))]
 
         # Check if phrases already exist
         try:

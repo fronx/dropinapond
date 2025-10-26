@@ -142,11 +142,17 @@ export function parseEgoGraphForFlow(egoData, analysisData = null) {
     });
   }
 
-  // Build rank map from recommendations
-  const rankMap = new Map(); // nodeId -> rank (1-indexed)
+  // Build rank map from recommendations (handle both old + new formats)
+  const rankMap = new Map();
+
   if (analysisData?.recommendations) {
-    analysisData.recommendations.forEach((rec, index) => {
-      rankMap.set(rec.node_id, index + 1);
+    const recs = Array.isArray(analysisData.recommendations)
+      ? analysisData.recommendations
+      : analysisData.recommendations.semantic_suggestions || [];
+
+    recs.forEach((rec, index) => {
+      const target = rec.node_id || rec.target;
+      if (target) rankMap.set(target, index + 1);
     });
   }
 
