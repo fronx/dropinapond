@@ -147,8 +147,6 @@ def analyze(params: Params) -> Path:
     # --- Blended effective weights ---
     alpha = params.alpha
     W = alpha * S + (1 - alpha) * A
-    P = _normalize_rows(W)             # diffusion operator
-    P1, P2, P3 = P, P @ P, P @ P @ P   # t1..t3
 
     # --- Mutual predictability and semantic distance fields (raw) ---
     # mean_vec already computed above
@@ -233,20 +231,6 @@ def analyze(params: Params) -> Path:
         "effective_edges": mat_to_dict(W),
     }
 
-    diffusion_heatmap = {
-        "node_order": nodes,
-        "node_names": [id_to_name[n] for n in nodes],
-        "matrices": {"t1": P1.tolist(), "t2": P2.tolist(), "t3": P3.tolist()},
-        "node_metrics": {
-            nid: {
-                "out_strength_struct": float(S[i].sum()),
-                "out_strength_aff": float(A[i].sum()),
-                "out_strength_eff": float(W[i].sum()),
-            }
-            for i, nid in enumerate(nodes)
-        },
-    }
-
     analysis = {
         "version": "semantic-flow-1.0",
         "ego_graph_file": params.name,
@@ -254,7 +238,6 @@ def analyze(params: Params) -> Path:
         "metrics": {
             "clusters": clusters,
             "layers": layers,
-            "kernel_neighborhoods": {"diffusion_heatmap": diffusion_heatmap},
         },
         "recommendations": {"semantic_suggestions": suggestions},
     }
