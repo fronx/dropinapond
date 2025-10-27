@@ -11,7 +11,7 @@ from .semantic import load_phrase_data, compute_semantic_affinity_matrix
 from .blending import blend_matrices, compute_fields
 from .clustering import detect_clusters
 from .suggestions import generate_suggestions
-from .serialize import build_analysis_output
+from .serialize import build_analysis_output, write_analysis
 
 __all__ = [
     "build_structural_matrix",
@@ -22,4 +22,5 @@ __all__ = [
     "detect_clusters",
     "generate_suggestions",
     "build_analysis_output",
+    "write_analysis",
 ]

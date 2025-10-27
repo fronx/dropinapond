@@ -6,6 +6,9 @@ Assemble analysis results into JSON-serializable format for export.
 """
 
 from __future__ import annotations
+import json
+from pathlib import Path
+from datetime import datetime
 from typing import Dict, List
 
 import numpy as np
@@ -167,3 +170,29 @@ def build_analysis_output(
         },
         "recommendations": {"semantic_suggestions": suggestions},
     }
+
+
+def write_analysis(analysis: dict, out_dir: Path, name: str) -> Path:
+    """
+    Write analysis to both timestamped and latest files.
+
+    Args:
+        analysis: Analysis dict to serialize
+        out_dir: Output directory
+        name: Graph name for filename
+
+    Returns:
+        Path to latest file
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts_path = out_dir / f"{name}_{ts}.json"
+    latest_path = out_dir / f"{name}_latest.json"
+
+    for path in [ts_path, latest_path]:
+        with open(path, "w") as f:
+            json.dump(analysis, f, indent=2)
+
+    print(f"[ok] Wrote {ts_path.name}")
+    print(f"[ok] Updated {latest_path.name}")
+    return latest_path
