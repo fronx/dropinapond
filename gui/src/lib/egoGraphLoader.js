@@ -144,12 +144,14 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
     });
   });
 
-  // Build rank map from recommendations
-  const rankMap = new Map();
-  const recs = analysisData.recommendations.semantic_suggestions || [];
-  recs.forEach((rec, index) => {
-    if (rec.target) rankMap.set(rec.target, index + 1);
-  });
+  // Build a set of edges to highlight
+  // TODO: This can be used to highlight specific edges of interest
+  // For example: edges representing new recommended connections, high-leverage introductions,
+  // or edges with particular semantic properties
+  // Format: Set of "source->target" strings
+  const highlightedEdges = new Set([
+    // Example: 'alice->bob', 'carol->dave'
+  ]);
 
   // Add self node (focal node)
   nodes.push({
@@ -177,9 +179,6 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
       overlap: analysisData.metrics.overlaps?.[nodeId],
     };
 
-    // Get rank from recommendations
-    const rank = rankMap.get(nodeId);
-
     nodes.push({
       id: connection.id,
       type: 'personNode',
@@ -190,7 +189,6 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
         clusterColor: clusterInfo?.color || '#d1d5db', // Default gray if no cluster
         clusterIndex: clusterInfo?.clusterIndex ?? null,
         analysisMetrics,
-        rank,
       },
       position: { x: 0, y: 0 }, // Will be overridden by D3 layout
     });
@@ -200,23 +198,18 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
   let edgeIndex = 0;
   Object.entries(effectiveEdges).forEach(([source, targets]) => {
     Object.entries(targets).forEach(([target, effectiveWeight]) => {
-      // Check if the target node is a top recommendation (rank 1-5)
-      const targetRank = rankMap.get(target);
-      const isTopRecommendation = targetRank && targetRank <= 5;
-      const isTopThree = targetRank && targetRank <= 3;
+      // Check if this edge should be highlighted
+      const edgeKey = `${source}->${target}`;
+      const isHighlighted = highlightedEdges.has(edgeKey);
 
-      // Style edges to top recommendations differently
+      // Style highlighted edges differently
       let strokeColor;
       let strokeWidth;
 
-      if (isTopThree) {
-        // Top 3: bright, prominent edges
-        strokeColor = 'rgba(59, 130, 246, 0.9)'; // Bright blue for top 3
+      if (isHighlighted) {
+        // Highlighted edges: bright blue
+        strokeColor = 'rgba(59, 130, 246, 0.9)';
         strokeWidth = Math.max(2.5, effectiveWeight * 20);
-      } else if (isTopRecommendation) {
-        // Rank 4-5: medium brightness
-        strokeColor = 'rgba(96, 165, 250, 0.7)'; // Medium blue
-        strokeWidth = Math.max(2, effectiveWeight * 20);
       } else {
         // Default: subtle gray
         strokeColor = `rgba(100, 100, 100, ${0.3 + effectiveWeight * 0.4})`;
@@ -230,7 +223,7 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
         type: 'default',
         data: {
           effectiveWeight,
-          rank: targetRank,
+          highlighted: isHighlighted,
         },
         style: {
           strokeWidth,
