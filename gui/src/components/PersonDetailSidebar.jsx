@@ -1,5 +1,12 @@
 import { useState, useEffect } from 'react';
-import { getMetricLabel, getSemanticFlowLabel } from '../lib/metricLabels';
+import {
+  getMetricLabel,
+  getSemanticFlowLabel,
+  extractSemanticFlowMetrics,
+  computeAllPercentiles,
+  getStructuralDescription,
+  getSemanticDistanceDescription
+} from '../lib/metricLabels';
 
 /**
  * Sidebar that appears when clicking a person node.
@@ -30,23 +37,15 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
   const isSemanticFlow = analysisData?.metrics?.layers !== undefined;
 
   // Extract metrics for this person from analysis data
-  const metrics = isSemanticFlow ? {
-    // Semantic flow metrics
-    structuralEdge: analysisData?.metrics?.layers?.structural_edges?.[egoGraphData.self.id]?.[person.id],
-    semanticAffinity: analysisData?.metrics?.layers?.semantic_affinity?.[egoGraphData.self.id]?.[person.id],
-    effectiveEdge: analysisData?.metrics?.layers?.effective_edges?.[egoGraphData.self.id]?.[person.id],
-    predictabilityRaw: analysisData?.metrics?.fields?.edge_fields?.[egoGraphData.self.id]?.[person.id]?.predictability_raw,
-    distanceRaw: analysisData?.metrics?.fields?.edge_fields?.[egoGraphData.self.id]?.[person.id]?.distance_raw,
-    predictabilityBlanket: analysisData?.metrics?.fields?.edge_fields_blanket?.[egoGraphData.self.id]?.[person.id]?.predictability_blanket,
-    explorationPotential: analysisData?.metrics?.fields?.edge_fields_blanket?.[egoGraphData.self.id]?.[person.id]?.exploration_potential,
-    coherenceNode: analysisData?.metrics?.coherence?.nodes?.[person.id],
-  } : {
-    // Legacy ego_ops metrics
-    readability: analysisData?.metrics?.per_neighbor_readability?.[person.id],
-    overlap: analysisData?.metrics?.overlaps?.[person.id],
-    orientationScore: analysisData?.metrics?.orientation_scores?.[person.id],
-    orientationBreakdown: analysisData?.metrics?.orientation_score_breakdowns?.[person.id],
-  };
+  const metrics = isSemanticFlow
+    ? extractSemanticFlowMetrics(analysisData, egoGraphData.self.id, person.id)
+    : {
+        // Legacy ego_ops metrics
+        readability: analysisData?.metrics?.per_neighbor_readability?.[person.id],
+        overlap: analysisData?.metrics?.overlaps?.[person.id],
+        orientationScore: analysisData?.metrics?.orientation_scores?.[person.id],
+        orientationBreakdown: analysisData?.metrics?.orientation_score_breakdowns?.[person.id],
+      };
 
   // Find which cluster this person belongs to
   let personCluster = null;
@@ -59,6 +58,11 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
       }
     });
   }
+
+  // Compute percentiles for relative metrics from the actual network data
+  const percentiles = isSemanticFlow
+    ? computeAllPercentiles(analysisData, egoGraphData.self.id)
+    : null;
 
   // Get cluster metrics if available
   let clusterMetrics = null;
@@ -281,203 +285,101 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
         </>
       ) : isSemanticFlow ? (
         <>
-          {/* Semantic Flow Metrics */}
+          {/* Semantic Flow Metrics - Humanized */}
 
-          {/* Edge Layer Metrics */}
+          {/* Relationship Summary */}
           {(metrics.structuralEdge !== undefined || metrics.semanticAffinity !== undefined) && (
             <div style={sectionStyle}>
-              <div style={sectionTitleStyle}>Relationship Layers</div>
-              <div style={explanationStyle}>
-                How structure and meaning combine in your connection with {fullPersonData.name}
-              </div>
-
-              <div style={codeBlockStyle}>
-                {metrics.structuralEdge !== undefined && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={labelStyle}>Structural Edge (S)</div>
-                    <div style={{ fontSize: '0.875rem', marginBottom: '4px' }}>
-                      <strong>{metrics.structuralEdge.toFixed(3)}</strong> — {getSemanticFlowLabel('structuralEdge', metrics.structuralEdge).label}
-                    </div>
-                    <div style={explanationStyle}>
-                      {getSemanticFlowLabel('structuralEdge', metrics.structuralEdge).interpretation}
-                    </div>
-                  </div>
-                )}
-
-                {metrics.semanticAffinity !== undefined && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={labelStyle}>Semantic Affinity (A)</div>
-                    <div style={{ fontSize: '0.875rem', marginBottom: '4px' }}>
-                      <strong>{metrics.semanticAffinity.toFixed(3)}</strong> — {getSemanticFlowLabel('semanticAffinity', metrics.semanticAffinity).label}
-                    </div>
-                    <div style={explanationStyle}>
-                      {getSemanticFlowLabel('semanticAffinity', metrics.semanticAffinity).interpretation}
-                    </div>
-                  </div>
-                )}
-
-                {metrics.effectiveEdge !== undefined && (
-                  <div>
-                    <div style={labelStyle}>Effective Edge (W)</div>
-                    <div style={{ fontSize: '0.875rem', marginBottom: '4px' }}>
-                      <strong>{metrics.effectiveEdge.toFixed(3)}</strong> — {getSemanticFlowLabel('effectiveEdge', metrics.effectiveEdge).label}
-                    </div>
-                    <div style={explanationStyle}>
-                      {getSemanticFlowLabel('effectiveEdge', metrics.effectiveEdge).interpretation}
-                    </div>
-                    <div style={{ ...explanationStyle, marginTop: '4px', fontSize: '0.75rem' }}>
-                      Formula: α·S + (1-α)·A where α = {analysisData?.parameters?.alpha || 0.4}
-                    </div>
-                  </div>
+              <div style={sectionTitleStyle}>Your Connection</div>
+              <div style={{ fontSize: '0.9375rem', lineHeight: '1.6', marginBottom: '0' }}>
+                {metrics.structuralEdge !== undefined && metrics.semanticAffinity !== undefined ? (
+                  <>
+                    <span style={{ textTransform: 'capitalize' }}>
+                      {getSemanticFlowLabel('structuralEdge', metrics.structuralEdge).label}
+                    </span>
+                    {' contact with '}
+                    <span>
+                      {getSemanticFlowLabel('semanticAffinity', metrics.semanticAffinity).label}
+                    </span>
+                    {' interests'}
+                    {metrics.effectiveEdge !== undefined && (
+                      <>
+                        {' — '}
+                        <strong>{getSemanticFlowLabel('effectiveEdge', metrics.effectiveEdge).label}</strong>
+                        {' overall'}
+                      </>
+                    )}
+                    .
+                  </>
+                ) : (
+                  metrics.structuralEdge !== undefined ? (
+                    <span style={{ textTransform: 'capitalize' }}>
+                      {getSemanticFlowLabel('structuralEdge', metrics.structuralEdge).label} contact.
+                    </span>
+                  ) : (
+                    <span style={{ textTransform: 'capitalize' }}>
+                      {getSemanticFlowLabel('semanticAffinity', metrics.semanticAffinity).label} interests.
+                    </span>
+                  )
                 )}
               </div>
             </div>
           )}
 
-          {/* Edge Field Metrics */}
+          {/* Mutual Understanding */}
           {(metrics.predictabilityRaw !== undefined || metrics.distanceRaw !== undefined) && (
             <div style={sectionStyle}>
-              <div style={sectionTitleStyle}>Semantic Field Alignment</div>
-              <div style={explanationStyle}>
-                How your semantic fields relate in space
-              </div>
-
-              <div style={codeBlockStyle}>
+              <div style={sectionTitleStyle}>Mutual Understanding</div>
+              <div style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>
                 {metrics.predictabilityRaw !== undefined && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={labelStyle}>Predictability (F)</div>
-                    <div style={{ fontSize: '0.875rem', marginBottom: '4px' }}>
-                      <strong>{metrics.predictabilityRaw.toFixed(3)}</strong> — {getSemanticFlowLabel('predictabilityRaw', metrics.predictabilityRaw).label}
-                    </div>
-                    <div style={explanationStyle}>
-                      {getSemanticFlowLabel('predictabilityRaw', metrics.predictabilityRaw).interpretation}
-                    </div>
-                    <div style={{ ...explanationStyle, marginTop: '4px', fontSize: '0.75rem' }}>
-                      Formula: √(A[you→them] × A[them→you])
-                    </div>
+                  <div style={{ marginBottom: metrics.distanceRaw !== undefined ? '8px' : '0' }}>
+                    <strong style={{ textTransform: 'capitalize' }}>
+                      {getSemanticFlowLabel('predictabilityRaw', metrics.predictabilityRaw).label}
+                    </strong>
+                    {' — '}
+                    {getSemanticFlowLabel('predictabilityRaw', metrics.predictabilityRaw).interpretation.toLowerCase()}
                   </div>
                 )}
-
                 {metrics.distanceRaw !== undefined && (
                   <div>
-                    <div style={labelStyle}>Semantic Distance (D)</div>
-                    <div style={{ fontSize: '0.875rem', marginBottom: '4px' }}>
-                      <strong>{metrics.distanceRaw.toFixed(3)}</strong> — {getSemanticFlowLabel('distanceRaw', metrics.distanceRaw).label}
-                    </div>
-                    <div style={explanationStyle}>
-                      {getSemanticFlowLabel('distanceRaw', metrics.distanceRaw).interpretation}
-                    </div>
+                    Your semantic centers are <strong>{getSemanticFlowLabel('distanceRaw', metrics.distanceRaw).label}</strong>.
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* Blanket (Context-Aware) Metrics */}
-          {(metrics.predictabilityBlanket !== undefined || metrics.explorationPotential !== undefined) && (
+          {/* In Your Network - neutral descriptions */}
+          {metrics.structuralEdge !== undefined && (
             <div style={sectionStyle}>
-              <div style={sectionTitleStyle}>Context-Aware Coupling</div>
-              <div style={explanationStyle}>
-                Relationship quality given your full attention budgets
-              </div>
-
-              <div style={codeBlockStyle}>
-                {metrics.predictabilityBlanket !== undefined && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={labelStyle}>Markov Blanket Coupling (F_MB)</div>
-                    <div style={{ fontSize: '0.875rem', marginBottom: '4px' }}>
-                      <strong>{metrics.predictabilityBlanket.toFixed(3)}</strong> — {getSemanticFlowLabel('predictabilityBlanket', metrics.predictabilityBlanket).label}
-                    </div>
-                    <div style={explanationStyle}>
-                      {getSemanticFlowLabel('predictabilityBlanket', metrics.predictabilityBlanket).interpretation}
-                    </div>
+              <div style={sectionTitleStyle}>In Your Network</div>
+              <div style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>
+                {/* Structural dimension */}
+                {getStructuralDescription(metrics.structuralEdge) && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>Structurally:</strong> {getStructuralDescription(metrics.structuralEdge)}
                   </div>
                 )}
 
-                {metrics.explorationPotential !== undefined && (
+                {/* Semantic dimension - use percentiles */}
+                {getSemanticDistanceDescription(metrics.distanceRaw, percentiles?.distanceRaw) && (
                   <div>
-                    <div style={labelStyle}>Exploration Potential (E_MB)</div>
-                    <div style={{ fontSize: '0.875rem', marginBottom: '4px' }}>
-                      <strong>{metrics.explorationPotential.toFixed(3)}</strong> — {getSemanticFlowLabel('explorationPotential', metrics.explorationPotential).label}
-                    </div>
-                    <div style={explanationStyle}>
-                      {getSemanticFlowLabel('explorationPotential', metrics.explorationPotential).interpretation}
-                    </div>
-                    <div style={{ ...explanationStyle, marginTop: '4px', fontSize: '0.75rem' }}>
-                      Formula: F_MB × (1-D)
-                    </div>
+                    <strong>Semantically:</strong> {getSemanticDistanceDescription(metrics.distanceRaw, percentiles?.distanceRaw)}
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* Node Coherence Metrics */}
+          {/* Node Coherence - Simplified */}
           {metrics.coherenceNode && (
             <div style={sectionStyle}>
-              <div style={sectionTitleStyle}>Cluster Fit</div>
-              <div style={explanationStyle}>
-                How well {fullPersonData.name} fits in their assigned cluster
-              </div>
-
-              <div style={codeBlockStyle}>
-                <div style={{ marginBottom: '8px' }}>
-                  <div style={labelStyle}>Region Index</div>
-                  <div style={{ fontSize: '0.875rem' }}>
-                    <strong>Cluster {metrics.coherenceNode.region_index}</strong>
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '8px' }}>
-                  <div style={labelStyle}>In-Region Coupling</div>
-                  <div style={{ fontSize: '0.875rem' }}>
-                    <strong>{metrics.coherenceNode.avg_in.toFixed(3)}</strong>
-                  </div>
-                  <div style={explanationStyle}>
-                    Average coupling to members of their cluster
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '8px' }}>
-                  <div style={labelStyle}>Out-Region Coupling</div>
-                  <div style={{ fontSize: '0.875rem' }}>
-                    <strong>{metrics.coherenceNode.avg_out.toFixed(3)}</strong>
-                  </div>
-                  <div style={explanationStyle}>
-                    Average coupling to members of other clusters
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '8px' }}>
-                  <div style={labelStyle}>Fit Margin</div>
-                  <div style={{ fontSize: '0.875rem' }}>
-                    <strong style={{
-                      color: metrics.coherenceNode.fit_diff > 0
-                        ? (isDarkMode ? '#86efac' : '#16a34a')
-                        : (isDarkMode ? '#fca5a5' : '#dc2626')
-                    }}>
-                      {metrics.coherenceNode.fit_diff > 0 ? '+' : ''}{metrics.coherenceNode.fit_diff.toFixed(3)}
-                    </strong>
-                  </div>
-                  <div style={explanationStyle}>
-                    Difference between in-region and out-region coupling
-                  </div>
-                </div>
-
+              <div style={sectionTitleStyle}>Role in Network</div>
+              <div style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>
                 <div>
-                  <div style={labelStyle}>Fit Ratio</div>
-                  <div style={{ fontSize: '0.875rem', marginBottom: '4px' }}>
-                    <strong style={{
-                      color: metrics.coherenceNode.fit_ratio >= 1
-                        ? (isDarkMode ? '#86efac' : '#16a34a')
-                        : (isDarkMode ? '#fca5a5' : '#dc2626')
-                    }}>
-                      {metrics.coherenceNode.fit_ratio.toFixed(2)}×
-                    </strong> — {getSemanticFlowLabel('fitRatio', metrics.coherenceNode.fit_ratio).label}
-                  </div>
-                  <div style={explanationStyle}>
-                    {getSemanticFlowLabel('fitRatio', metrics.coherenceNode.fit_ratio).interpretation}
-                  </div>
+                  {fullPersonData.name} is a <strong>{getSemanticFlowLabel('fitRatio', metrics.coherenceNode.fit_ratio).label}</strong> in Cluster {metrics.coherenceNode.region_index}.
+                  {' '}
+                  {getSemanticFlowLabel('fitRatio', metrics.coherenceNode.fit_ratio).interpretation}
                 </div>
               </div>
             </div>
@@ -787,92 +689,57 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
                 })}
               </div>
 
-              {clusterMetrics && (
+              {clusterMetrics && isSemanticFlow && (
+                <>
+                  <div style={{ ...subSectionTitleStyle, marginTop: '16px' }}>Cluster Cohesion</div>
+                  <div style={{ fontSize: '0.8125rem', lineHeight: '1.6' }}>
+                    {clusterMetrics.coherence_MB !== undefined && (
+                      <div>
+                        This cluster holds together with <strong>{(clusterMetrics.coherence_MB * 100).toFixed(0)}%</strong> internal coherence.
+                        {clusterMetrics.conductance_sem !== undefined && clusterMetrics.conductance_sem < 0.3 && (
+                          <span> Clear boundaries.</span>
+                        )}
+                        {clusterMetrics.silhouette_D !== undefined && clusterMetrics.silhouette_D > 0.3 && (
+                          <span> Well-separated from other groups.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {clusterMetrics && !isSemanticFlow && (
                 <>
                   <div style={subSectionTitleStyle}>
-                    {isSemanticFlow ? 'Region Coherence Metrics' : 'Cluster Metrics'}
+                    Cluster Metrics
                   </div>
-                  {isSemanticFlow ? (
-                    <div style={codeBlockStyle}>
+                  <div style={{ fontSize: '0.8125rem', lineHeight: '1.6' }}>
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>Public Legibility:</strong>{' '}
+                      {getMetricLabel('public_legibility', clusterMetrics.publicLegibility).label}
+                      <div style={explanationStyle}>
+                        How well this cluster collectively understands you
+                      </div>
+                    </div>
+                    {clusterMetrics.subjectiveAttunement !== undefined && (
                       <div style={{ marginBottom: '8px' }}>
-                        <div style={labelStyle}>Internal Coupling (F_MB)</div>
-                        <div style={{ fontSize: '0.8125rem' }}>
-                          <strong>{clusterMetrics.internal_MB?.toFixed(3) || 'N/A'}</strong>
-                        </div>
+                        <strong>Subjective Attunement:</strong>{' '}
+                        {getMetricLabel('subjective_attunement', clusterMetrics.subjectiveAttunement).label}
                         <div style={explanationStyle}>
-                          Average context-aware coupling within this cluster
+                          How well you understand this cluster's interests
                         </div>
                       </div>
-
-                      <div style={{ marginBottom: '8px' }}>
-                        <div style={labelStyle}>External Coupling (F_MB)</div>
-                        <div style={{ fontSize: '0.8125rem' }}>
-                          <strong>{clusterMetrics.external_MB?.toFixed(3) || 'N/A'}</strong>
-                        </div>
-                        <div style={explanationStyle}>
-                          Average context-aware coupling to other clusters
-                        </div>
-                      </div>
-
-                      <div style={{ marginBottom: '8px' }}>
-                        <div style={labelStyle}>Coherence (F_MB)</div>
-                        <div style={{ fontSize: '0.8125rem' }}>
-                          <strong>{clusterMetrics.coherence_MB?.toFixed(3) || 'N/A'}</strong>
-                        </div>
-                        <div style={explanationStyle}>
-                          How strongly this cluster holds together: internal / (internal + external)
-                        </div>
-                      </div>
-
-                      <div style={{ marginBottom: '8px' }}>
-                        <div style={labelStyle}>Conductance</div>
-                        <div style={{ fontSize: '0.8125rem' }}>
-                          <strong>{clusterMetrics.conductance_sem?.toFixed(3) || 'N/A'}</strong>
-                        </div>
-                        <div style={explanationStyle}>
-                          Boundary clarity (lower = cleaner boundary)
-                        </div>
-                      </div>
-
+                    )}
+                    {clusterMetrics.heatResidualNovelty !== undefined && (
                       <div>
-                        <div style={labelStyle}>Silhouette (Distance)</div>
-                        <div style={{ fontSize: '0.8125rem' }}>
-                          <strong>{clusterMetrics.silhouette_D?.toFixed(3) || 'N/A'}</strong>
-                        </div>
+                        <strong>Novelty:</strong>{' '}
+                        {getMetricLabel('heat_residual_novelty', clusterMetrics.heatResidualNovelty).label}
                         <div style={explanationStyle}>
-                          How well-separated by semantic distance (closer to 1 = better)
+                          Semantic distance - how new this cluster's territory is
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '0.8125rem', lineHeight: '1.6' }}>
-                      <div style={{ marginBottom: '8px' }}>
-                        <strong>Public Legibility:</strong>{' '}
-                        {getMetricLabel('public_legibility', clusterMetrics.publicLegibility).label}
-                        <div style={explanationStyle}>
-                          How well this cluster collectively understands you
-                        </div>
-                      </div>
-                      {clusterMetrics.subjectiveAttunement !== undefined && (
-                        <div style={{ marginBottom: '8px' }}>
-                          <strong>Subjective Attunement:</strong>{' '}
-                          {getMetricLabel('subjective_attunement', clusterMetrics.subjectiveAttunement).label}
-                          <div style={explanationStyle}>
-                            How well you understand this cluster's interests
-                          </div>
-                        </div>
-                      )}
-                      {clusterMetrics.heatResidualNovelty !== undefined && (
-                        <div>
-                          <strong>Novelty:</strong>{' '}
-                          {getMetricLabel('heat_residual_novelty', clusterMetrics.heatResidualNovelty).label}
-                          <div style={explanationStyle}>
-                            Semantic distance - how new this cluster's territory is
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </>
               )}
             </div>
