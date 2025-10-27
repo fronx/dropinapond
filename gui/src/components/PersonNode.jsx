@@ -34,18 +34,17 @@ export function PersonNode({ data, selected }) {
   let borderColor = isDarkMode ? '#555' : '#d1d5db';
 
   if (clusterColor) {
-    borderColor = clusterColor;
-
     // Calculate saturation based on fit category
     // Strong fits get vibrant colors, misfits get nearly grayscale
     let desaturationAmount = 0; // default for strong fit or no fit data
     if (fitCategory === 'strong') {
       desaturationAmount = 0; // full saturation - vibrant colors
     } else if (fitCategory === 'borderline') {
-      desaturationAmount = 2; // moderate desaturation
+      desaturationAmount = 1.5; // moderate desaturation
     } else if (fitCategory === 'misfit') {
-      desaturationAmount = 4; // heavy desaturation - almost gray
+      desaturationAmount = 2.5; // heavy desaturation - almost gray
     }
+    borderColor = chroma(clusterColor).desaturate(desaturationAmount);
 
     if (isDarkMode) {
       // In dark mode, darken the color and adjust saturation
