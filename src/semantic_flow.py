@@ -33,8 +33,8 @@ from embeddings import get_embedding_service
 @dataclass
 class Params:
     name: str = "fronx"
-    alpha: float = 0.3        # blend: 1.0 = structural only
-    cos_min: float = 0.5      # ignore phrase-pair cosine below this
+    alpha: float = 0.4        # blend: 1.0 = structural only
+    cos_min: float = 0.25     # ignore phrase-pair cosine below this
     suggest_k: int = 3        # top-N non-edges suggested per node
     suggest_pool: int = 15    # how many nearest-by-mean to check
     export_dir: Optional[Path] = None
