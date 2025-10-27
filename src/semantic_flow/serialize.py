@@ -134,7 +134,8 @@ def build_analysis_output(
     E_MB: np.ndarray,
     clusters: List[List[str]],
     suggestions: List[Dict],
-    nodes: List[str]
+    nodes: List[str],
+    coherence: Dict = None,
 ) -> dict:
     """
     Assemble complete analysis output for JSON export.
@@ -156,7 +157,7 @@ def build_analysis_output(
     Returns:
         Complete analysis dict ready for JSON serialization
     """
-    return {
+    metrics = {
         "version": "semantic-flow-1.0",
         "ego_graph_file": graph_name,
         "parameters": params,
@@ -170,6 +171,9 @@ def build_analysis_output(
         },
         "recommendations": {"semantic_suggestions": suggestions},
     }
+    if coherence is not None:
+        metrics["metrics"]["coherence"] = coherence
+    return metrics
 
 
 def write_analysis(analysis: dict, out_dir: Path, name: str) -> Path:

@@ -31,6 +31,7 @@ from semantic_flow import (
     build_analysis_output,
     write_analysis,
 )
+from semantic_flow.coherence import compute_coherence as compute_semantic_coherence
 
 
 @dataclass
@@ -70,8 +71,11 @@ def analyze(params: Params) -> Path:
         cos_min=params.cos_min, suggest_k=params.suggest_k, suggest_pool=params.suggest_pool
     )
 
+    # Compute coherence using existing clusters as basis
+    coherence = compute_semantic_coherence(nodes, clusters, F, D, F_MB)
+
     analysis = build_analysis_output(
-        params.name, vars(params), S, A, W, F, D, F_MB, E_MB, clusters, suggestions, nodes
+        params.name, vars(params), S, A, W, F, D, F_MB, E_MB, clusters, suggestions, nodes, coherence
     )
 
     return write_analysis(analysis, out_dir, params.name)
