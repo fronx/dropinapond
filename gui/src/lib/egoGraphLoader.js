@@ -116,45 +116,39 @@ export async function loadLatestAnalysis(name) {
 /**
  * Parses ego graph data into xyflow-compatible nodes and edges
  * @param {object} egoData - Ego graph JSON data
- * @param {object|null} analysisData - Optional analysis data with clusters
+ * @param {object} analysisData - Analysis data with effective edges and clusters
  */
-export function parseEgoGraphForFlow(egoData, analysisData = null) {
+export function parseEgoGraphForFlow(egoData, analysisData) {
   const nodes = [];
   const edges = [];
 
+  // Use effective edges from analysis (blend of structural + semantic)
+  const effectiveEdges = analysisData.metrics.layers.effective_edges;
+
   // Build a map of connection strengths from focal node to each person
   const strengthMap = new Map();
-  egoData.edges.forEach((edge) => {
-    if (edge.source === egoData.self.id) {
-      strengthMap.set(edge.target, edge.actual || 0.3);
-    }
+  if (effectiveEdges[egoData.self.id]) {
+    Object.entries(effectiveEdges[egoData.self.id]).forEach(([target, weight]) => {
+      strengthMap.set(target, weight);
+    });
+  }
+
+  // Build cluster assignment map
+  const clusterMap = new Map(); // nodeId -> { clusterIndex, color }
+  const clusterColors = generateClusterColors(analysisData.metrics.clusters.length);
+  analysisData.metrics.clusters.forEach((cluster, clusterIndex) => {
+    const color = clusterColors[clusterIndex];
+    cluster.forEach((nodeId) => {
+      clusterMap.set(nodeId, { clusterIndex, color });
+    });
   });
 
-  // Build cluster assignment map if analysis data is available
-  const clusterMap = new Map(); // nodeId -> { clusterIndex, color }
-  if (analysisData?.metrics?.clusters) {
-    const clusterColors = generateClusterColors(analysisData.metrics.clusters.length);
-    analysisData.metrics.clusters.forEach((cluster, clusterIndex) => {
-      const color = clusterColors[clusterIndex];
-      cluster.forEach((nodeId) => {
-        clusterMap.set(nodeId, { clusterIndex, color });
-      });
-    });
-  }
-
-  // Build rank map from recommendations (handle both old + new formats)
+  // Build rank map from recommendations
   const rankMap = new Map();
-
-  if (analysisData?.recommendations) {
-    const recs = Array.isArray(analysisData.recommendations)
-      ? analysisData.recommendations
-      : analysisData.recommendations.semantic_suggestions || [];
-
-    recs.forEach((rec, index) => {
-      const target = rec.node_id || rec.target;
-      if (target) rankMap.set(target, index + 1);
-    });
-  }
+  const recs = analysisData.recommendations.semantic_suggestions || [];
+  recs.forEach((rec, index) => {
+    if (rec.target) rankMap.set(rec.target, index + 1);
+  });
 
   // Add self node (focal node)
   nodes.push({
@@ -175,12 +169,12 @@ export function parseEgoGraphForFlow(egoData, analysisData = null) {
     const clusterInfo = clusterMap.get(connection.id);
     const nodeId = connection.id;
 
-    // Extract analysis metrics for this node
-    const analysisMetrics = analysisData?.metrics ? {
+    // Extract analysis metrics for this node (if they exist in this analysis format)
+    const analysisMetrics = {
       orientationScore: analysisData.metrics.orientation_scores?.[nodeId],
       readability: analysisData.metrics.per_neighbor_readability?.[nodeId],
       overlap: analysisData.metrics.overlaps?.[nodeId],
-    } : {};
+    };
 
     // Get rank from recommendations
     const rank = rankMap.get(nodeId);
@@ -201,65 +195,65 @@ export function parseEgoGraphForFlow(egoData, analysisData = null) {
     });
   });
 
-  // Add edges with recommendation-based styling
-  egoData.edges.forEach((edge, index) => {
-    const actualStrength = typeof edge.actual === 'number' ? edge.actual : 0.3;
+  // Add edges from effective edges layer (all edges, not just from focal node)
+  let edgeIndex = 0;
+  Object.entries(effectiveEdges).forEach(([source, targets]) => {
+    Object.entries(targets).forEach(([target, effectiveWeight]) => {
+      // Check if the target node is a top recommendation (rank 1-5)
+      const targetRank = rankMap.get(target);
+      const isTopRecommendation = targetRank && targetRank <= 5;
+      const isTopThree = targetRank && targetRank <= 3;
 
-    // Check if the target node is a top recommendation (rank 1-5)
-    const targetRank = rankMap.get(edge.target);
-    const isTopRecommendation = targetRank && targetRank <= 5;
-    const isTopThree = targetRank && targetRank <= 3;
+      // Style edges to top recommendations differently
+      let strokeColor;
+      let strokeWidth;
 
-    // Style edges to top recommendations differently
-    let strokeColor;
-    let strokeWidth;
+      if (isTopThree) {
+        // Top 3: bright, prominent edges
+        strokeColor = 'rgba(59, 130, 246, 0.9)'; // Bright blue for top 3
+        strokeWidth = Math.max(2.5, effectiveWeight * 20);
+      } else if (isTopRecommendation) {
+        // Rank 4-5: medium brightness
+        strokeColor = 'rgba(96, 165, 250, 0.7)'; // Medium blue
+        strokeWidth = Math.max(2, effectiveWeight * 20);
+      } else {
+        // Default: subtle gray
+        strokeColor = `rgba(100, 100, 100, ${0.3 + effectiveWeight * 0.4})`;
+        strokeWidth = Math.max(1, effectiveWeight * 20);
+      }
 
-    if (isTopThree) {
-      // Top 3: bright, prominent edges
-      strokeColor = 'rgba(59, 130, 246, 0.9)'; // Bright blue for top 3
-      strokeWidth = Math.max(2.5, actualStrength * 20);
-    } else if (isTopRecommendation) {
-      // Rank 4-5: medium brightness
-      strokeColor = 'rgba(96, 165, 250, 0.7)'; // Medium blue
-      strokeWidth = Math.max(2, actualStrength * 20);
-    } else {
-      // Default: subtle gray
-      strokeColor = `rgba(100, 100, 100, ${0.3 + actualStrength * 0.4})`;
-      strokeWidth = Math.max(1, actualStrength * 20);
-    }
-
-    edges.push({
-      id: `${edge.source}-${edge.target}-${index}`,
-      source: edge.source,
-      target: edge.target,
-      type: 'default',
-      data: {
-        actualStrength,
-        potential: edge.potential,
-        metadata: edge.metadata,
-        rank: targetRank,
-      },
-      style: {
-        strokeWidth,
-        stroke: strokeColor,
-      },
-      animated: false, // Animate top 3 for extra emphasis
+      edges.push({
+        id: `${source}-${target}-${edgeIndex}`,
+        source: source,
+        target: target,
+        type: 'default',
+        data: {
+          effectiveWeight,
+          rank: targetRank,
+        },
+        style: {
+          strokeWidth,
+          stroke: strokeColor,
+        },
+        animated: false,
+      });
+      edgeIndex++;
     });
   });
 
-  // Extract cluster-level and overall metrics
-  const clusterMetrics = analysisData?.metrics ? {
+  // Extract cluster-level and overall metrics (if they exist in this analysis format)
+  const clusterMetrics = {
     publicLegibilityPerCluster: analysisData.metrics.public_legibility_per_cluster,
     subjectiveAttunementPerCluster: analysisData.metrics.subjective_attunement_per_cluster,
     heatResidualNovelty: analysisData.metrics.heat_residual_novelty,
-  } : null;
+  };
 
-  const overallMetrics = analysisData?.metrics ? {
+  const overallMetrics = {
     attentionEntropy: analysisData.metrics.attention_entropy,
     publicLegibilityOverall: analysisData.metrics.public_legibility_overall,
-  } : null;
+  };
 
-  const recommendations = analysisData?.recommendations || null;
+  const recommendations = analysisData.recommendations;
 
   // Build a map of node IDs to names for display
   const nodeNameMap = {};
