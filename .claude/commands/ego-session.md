@@ -32,6 +32,11 @@ Be **warm, curious, and natural**. This should feel like a thoughtful conversati
 - Bridge opportunities ("X introduced me to Y")
 - **Shared characteristics**: When the user describes shared traits, qualities, or ways of thinking with another person, add these to BOTH the other person's phrases AND the user's own phrases in self.json
 
+**IMPORTANT - Don't forget self.json**: As you learn about other people, you're also learning about the focal node (user). Always check if information reveals something about the user's own interests, activities, or values that should be added to `self.json`. For example:
+- "I worked as a freelancer for X" → add "freelance work" to user's phrases
+- "We both care about Y" → add Y to both person's phrases AND user's phrases
+- "I'm trying to connect with their DJ network" → confirms importance of topic to user
+
 ## Data Extraction
 
 As the conversation flows, extract structured information:
