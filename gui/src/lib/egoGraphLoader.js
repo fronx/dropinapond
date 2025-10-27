@@ -125,13 +125,14 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
   // Use effective edges from analysis (blend of structural + semantic)
   const effectiveEdges = analysisData.metrics.layers.effective_edges;
 
-  // Build a map of connection strengths from focal node to each person
+  // Build a map of connection strengths from focal node to each person using raw edges
+  // (for node sizing - we want this based on actual relationship strength, not computed similarity)
   const strengthMap = new Map();
-  if (effectiveEdges[egoData.self.id]) {
-    Object.entries(effectiveEdges[egoData.self.id]).forEach(([target, weight]) => {
-      strengthMap.set(target, weight);
-    });
-  }
+  egoData.edges.forEach(edge => {
+    if (edge.source === egoData.self.id) {
+      strengthMap.set(edge.target, edge.actual);
+    }
+  });
 
   // Build cluster assignment map
   const clusterMap = new Map(); // nodeId -> { clusterIndex, color }

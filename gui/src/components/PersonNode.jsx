@@ -24,7 +24,7 @@ export function PersonNode({ data, selected }) {
   }, []);
 
   // Scale node size based on connection strength (smaller overall)
-  const scale = isSelf ? 0.7 : 0.35 + (connectionStrength * 0.35);
+  const scale = isSelf ? 0.7 : 0.3 + (connectionStrength * 0.5);
   const fontSize = 0.875 * scale;
   const padding = `${8 * scale}px ${16 * scale}px`;
 
@@ -117,8 +117,8 @@ export function PersonNode({ data, selected }) {
           borderRadius: '50%',
           backgroundColor:
             latestAvailability.score > 0.7 ? '#22c55e' :
-            latestAvailability.score > 0.4 ? '#eab308' :
-            '#ef4444',
+              latestAvailability.score > 0.4 ? '#eab308' :
+                '#ef4444',
           boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
         }} />
       )}
