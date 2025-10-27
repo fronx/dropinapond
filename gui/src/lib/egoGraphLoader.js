@@ -101,14 +101,26 @@ export async function loadLatestAnalysis(name) {
 
     // For now, try to fetch with a wildcard approach or accept it might fail
     // We'll implement a simple approach: look for a _latest.json file
-    const response = await fetch(`/data/analyses/${name}_latest.json`);
+    const url = `/data/analyses/${name}_latest.json`;
+    console.log('Fetching analysis from:', url);
+    const response = await fetch(url);
+    console.log('Analysis fetch response:', response.status, response.ok);
     if (!response.ok) {
       console.warn(`No analysis found for "${name}", proceeding without analysis data`);
       return null;
     }
-    return await response.json();
+
+    // Get the text first to handle Infinity values
+    const text = await response.text();
+    // Replace Infinity with a very large number that JSON can handle
+    // We'll use a special marker value that we can detect later
+    const sanitizedText = text.replace(/:\s*Infinity\b/g, ': 9999999999');
+    const data = JSON.parse(sanitizedText);
+
+    console.log('Analysis data loaded:', data);
+    return data;
   } catch (error) {
-    console.warn(`Could not load analysis for "${name}":`, error.message);
+    console.error(`Could not load analysis for "${name}":`, error);
     return null;
   }
 }
@@ -121,6 +133,14 @@ export async function loadLatestAnalysis(name) {
 export function parseEgoGraphForFlow(egoData, analysisData) {
   const nodes = [];
   const edges = [];
+
+  console.log('parseEgoGraphForFlow called with:', { egoData, analysisData });
+
+  // Check if we have the necessary data
+  if (!analysisData || !analysisData.metrics) {
+    console.error('Missing analysisData or analysisData.metrics');
+    throw new Error('Analysis data is missing or invalid');
+  }
 
   // Use effective edges from analysis (blend of structural + semantic)
   const effectiveEdges = analysisData.metrics.layers.effective_edges;
@@ -167,6 +187,28 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
     position: { x: 0, y: 0 }, // Will be overridden by D3 layout
   });
 
+  // Calculate fit thresholds for fit_ratio categorization (if coherence data exists)
+  let top30PercentileFitRatio = 3;
+  let top30PercentileFitDiff = 0;
+
+  if (analysisData.metrics.coherence?.nodes) {
+    const fitRatios = [];
+    const fitDiffs = [];
+    Object.values(analysisData.metrics.coherence.nodes).forEach(nodeData => {
+      // Skip Infinity values (represented as 9999999999 after sanitization)
+      if (nodeData.fit_ratio !== 9999999999 && nodeData.fit_ratio !== Infinity) {
+        fitRatios.push(nodeData.fit_ratio);
+      }
+      fitDiffs.push(nodeData.fit_diff);
+    });
+    fitRatios.sort((a, b) => b - a); // Sort descending
+    fitDiffs.sort((a, b) => b - a); // Sort descending
+    const top30PercentileRatioIndex = Math.floor(fitRatios.length * 0.3);
+    top30PercentileFitRatio = fitRatios[top30PercentileRatioIndex] || 3;
+    const top30PercentileDiffIndex = Math.floor(fitDiffs.length * 0.3);
+    top30PercentileFitDiff = fitDiffs[top30PercentileDiffIndex] || 0;
+  }
+
   // Add connection nodes
   egoData.connections.forEach((connection) => {
     const clusterInfo = clusterMap.get(connection.id);
@@ -179,6 +221,20 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
       overlap: analysisData.metrics.overlaps?.[nodeId],
     };
 
+    // Calculate fit category from coherence data
+    const coherenceData = analysisData.metrics.coherence?.nodes?.[nodeId];
+    let fitCategory = 'none'; // none, misfit, borderline, strong
+    if (coherenceData) {
+      const { fit_ratio, fit_diff } = coherenceData;
+      if (fit_ratio === Infinity || fit_ratio >= top30PercentileFitRatio || fit_diff >= top30PercentileFitDiff) {
+        fitCategory = 'strong';
+      } else if (fit_ratio >= 1 && fit_ratio < top30PercentileFitRatio) {
+        fitCategory = 'borderline';
+      } else if (fit_ratio < 1 || fit_diff <= 0) {
+        fitCategory = 'misfit';
+      }
+    }
+
     nodes.push({
       id: connection.id,
       type: 'personNode',
@@ -189,6 +245,8 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
         clusterColor: clusterInfo?.color || '#d1d5db', // Default gray if no cluster
         clusterIndex: clusterInfo?.clusterIndex ?? null,
         analysisMetrics,
+        fitCategory, // Add fit category for visualization
+        coherenceData, // Include raw coherence data for debugging/tooltip
       },
       position: { x: 0, y: 0 }, // Will be overridden by D3 layout
     });

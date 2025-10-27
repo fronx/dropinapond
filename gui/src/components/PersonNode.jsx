@@ -5,7 +5,7 @@ import chroma from 'chroma-js';
 import { getMetricLabel } from '../lib/metricLabels';
 
 export function PersonNode({ data, selected }) {
-  const { person, isSelf, connectionStrength = 0.5, clusterColor, analysisMetrics } = data;
+  const { person, isSelf, connectionStrength = 0.5, clusterColor, analysisMetrics, fitCategory } = data;
   const latestAvailability = person.availability?.[0];
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
@@ -36,16 +36,35 @@ export function PersonNode({ data, selected }) {
   if (clusterColor) {
     borderColor = clusterColor;
 
+    // Calculate saturation based on fit category
+    // Strong fits get vibrant colors, misfits get nearly grayscale
+    let desaturationAmount = 0; // default for strong fit or no fit data
+    if (fitCategory === 'strong') {
+      desaturationAmount = 0; // full saturation - vibrant colors
+    } else if (fitCategory === 'borderline') {
+      desaturationAmount = 2; // moderate desaturation
+    } else if (fitCategory === 'misfit') {
+      desaturationAmount = 4; // heavy desaturation - almost gray
+    }
+
     if (isDarkMode) {
-      // In dark mode, darken the color
-      const bgColor = chroma(clusterColor).darken(0.7);
+      // In dark mode, darken the color and adjust saturation
+      let bgColor = chroma(clusterColor).darken(0.7);
+      // Desaturate based on fit
+      if (desaturationAmount > 0) {
+        bgColor = bgColor.desaturate(desaturationAmount);
+      }
       backgroundColor = bgColor.hex();
       // Calculate text color based on background luminance
       const luminance = bgColor.luminance();
       textColor = luminance > 0.5 ? '#000000' : '#ffffff';
     } else {
-      // In light mode, lighten the color significantly to ensure light background
-      const bgColor = chroma(clusterColor).brighten(1.5);
+      // In light mode, lighten the color significantly and adjust saturation
+      let bgColor = chroma(clusterColor).brighten(1.5);
+      // Desaturate based on fit
+      if (desaturationAmount > 0) {
+        bgColor = bgColor.desaturate(desaturationAmount);
+      }
       backgroundColor = bgColor.hex();
       // Always use black text in light mode for consistency
       textColor = '#000000';
