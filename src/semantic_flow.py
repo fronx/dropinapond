@@ -142,12 +142,41 @@ def analyze(params: Params) -> Path:
                 continue
             Ej, wj = phrase_E[tgt], phrase_w[tgt]
             A[i, j] = _semantic_affinity(Ei, wi, Ej, wj, cos_min=params.cos_min)
+            print("DEBUG", src, tgt, A[i, j])
 
     # --- Blended effective weights ---
     alpha = params.alpha
     W = alpha * S + (1 - alpha) * A
     P = _normalize_rows(W)             # diffusion operator
     P1, P2, P3 = P, P @ P, P @ P @ P   # t1..t3
+
+    # --- Mutual predictability and semantic distance fields (raw) ---
+    # mean_vec already computed above
+    M = np.stack([mean_vec[nid] for nid in nodes], axis=0)
+    M_norm = M / np.maximum(np.linalg.norm(M, axis=1, keepdims=True), 1e-12)
+
+    # Predictability: symmetric mutual affinity
+    F = np.sqrt(A * A.T)
+
+    # Distance: 1 - cosine similarity between node mean embeddings
+    D = 1 - np.clip(M_norm @ M_norm.T, -1.0, 1.0)
+
+    # Normalize both to [0,1] for comparability
+    F /= F.max() + 1e-12
+    D /= D.max() + 1e-12
+
+    # --- Markov-blanket coupling (mutual predictability given context) ---
+    # Normalize rows of A to get local conditional probabilities, then
+    # take elementwise product with its transpose to get symmetric coupling.
+    row_sums = np.sum(A, axis=1, keepdims=True) + 1e-12
+    A_norm = A / row_sums
+    F_MB = A_norm * A_norm.T
+    # Normalize for comparability
+    F_MB /= F_MB.max() + 1e-12
+
+    # Optional derived measure combining compatibility and contrast
+    # Uses already-normalized D in [0,1]
+    E_MB = F_MB * (1 - D)
 
     # --- Clusters (undirected for simplicity) ---
     Wu = W + W.T
@@ -229,6 +258,35 @@ def analyze(params: Params) -> Path:
         },
         "recommendations": {"semantic_suggestions": suggestions},
     }
+
+    edge_fields = {}
+    for i, src in enumerate(nodes):
+        row = {}
+        for j, tgt in enumerate(nodes):
+            if i == j:
+                continue
+            row[tgt] = {
+                "predictability_raw": float(F[i, j]),
+                "distance_raw": float(D[i, j]),
+            }
+        edge_fields[src] = row
+
+    analysis["metrics"]["fields"] = {"edge_fields": edge_fields}
+
+    # Export Markov-blanket coupling fields
+    edge_fields_MB = {}
+    for i, src in enumerate(nodes):
+        row = {}
+        for j, tgt in enumerate(nodes):
+            if i == j:
+                continue
+            row[tgt] = {
+                "predictability_blanket": float(F_MB[i, j]),
+                "exploration_potential": float(E_MB[i, j]),
+            }
+        edge_fields_MB[src] = row
+
+    analysis["metrics"]["fields"]["edge_fields_blanket"] = edge_fields_MB
 
     ts_path, latest_path = _timestamped_and_latest_paths(out_dir, params.name)
     with open(ts_path, "w") as f:
