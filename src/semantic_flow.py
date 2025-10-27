@@ -57,7 +57,13 @@ def analyze(params: Params) -> Path:
     phrase_E, phrase_w, mean_vec = load_phrase_data(embedding_service, params.name, nodes)
     A = compute_semantic_affinity_matrix(S, nodes, phrase_E, phrase_w, cos_min=params.cos_min)
     W = blend_matrices(S, A, params.alpha)
+
+    # - F: Raw mutual predictability (symmetric sqrt of A * A.T)
+    # - D: Semantic distance (1 - cosine similarity of mean embeddings)
+    # - F_MB: Markov-blanket predictability (coupling given context)
+    # - E_MB: Exploration potential (F_MB * (1 - D))
     F, D, F_MB, E_MB = compute_fields(A, mean_vec, nodes)
+
     clusters = detect_clusters(W, nodes)
     suggestions = generate_suggestions(
         nodes, mean_vec, phrase_E, phrase_w, existing_edges,
