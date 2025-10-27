@@ -4,6 +4,16 @@
 
 This guide explains what each number means socially and semantically, using the actual field names present in the JSON.
 
+**Generating the Analysis**
+```bash
+uv run src/semantic_flow.py <name> [--alpha 0.4] [--cos-min 0.25]
+```
+- `<name>`: Name of your ego graph (e.g., `fronx` looks for `data/ego_graphs/fronx/`)
+- `--alpha`: Blending weight (default 0.4). Higher = more structural, lower = more semantic
+- `--cos-min`: Minimum phrase similarity threshold (default 0.25)
+
+Output written to `data/analyses/<name>_latest.json` with timestamped backup.
+
 **Orientation**
 - `version`, `ego_graph_file`, `parameters` describe the run context.
 - Core results live under `metrics` with three parts: `layers`, `fields`, and `coherence`.
@@ -97,6 +107,42 @@ This guide explains what each number means socially and semantically, using the 
 
 **Notes and caveats**
 - Direction matters for `structural_edges`, `semantic_affinity`, and `effective_edges`. Mutual metrics (`predictability_raw`, `predictability_blanket`) summarize reciprocity.
-- `semantic_affinity` is computed only where an edge exists in `structural_edges`; zeros elsewhere are “not evaluated,” not necessarily “no affinity.”
+- `semantic_affinity` is computed only where an edge exists in `structural_edges`; zeros elsewhere are "not evaluated," not necessarily "no affinity."
 - All reported fields are normalized to be comparable in [0,1] unless noted.
+
+**Visualization (GUI Components)**
+
+The web-based GUI reads the analysis JSON and provides interactive visualization:
+
+- **Graph Layout** ([gui/src/lib/egoGraphLoader.js](../gui/src/lib/egoGraphLoader.js))
+  - Loads both ego graph data and analysis results
+  - Uses `effective_edges` to position nodes via force-directed layout
+  - Colors nodes by cluster membership with saturation indicating fit
+
+- **Main View** ([gui/src/components/EgoGraphView.jsx](../gui/src/components/EgoGraphView.jsx))
+  - Interactive force-directed graph using ReactFlow
+  - Node sizing based on `structural_edges` (actual relationship strength)
+  - Edge thickness/opacity based on `effective_edges` (blended weight)
+
+- **Node Rendering** ([gui/src/components/PersonNode.jsx](../gui/src/components/PersonNode.jsx))
+  - **Color saturation** encodes `fit_ratio` from `metrics.coherence.nodes`:
+    - Strong fit (ratio ≥ top 30th percentile): Full saturation
+    - Borderline fit (1.0 ≤ ratio < threshold): Moderate desaturation
+    - Misfit (ratio < 1.0): Heavy desaturation (nearly gray)
+  - **Border color** uses cluster color adjusted by fit category
+  - Availability indicator (green/yellow/red dot) from latest availability score
+  - Tooltips show analysis metrics on hover
+
+The GUI creates a "living map" where:
+- **Position** reflects semantic-structural blend (force simulation on `effective_edges`)
+- **Color hue** shows cluster membership (semantic-structural communities)
+- **Color saturation** reveals individual fit within cluster
+- **Node size** represents actual relationship strength from `structural_edges`
+- **Edge thickness** shows blended effective weight
+
+This visual encoding lets you quickly identify:
+- Well-integrated cluster members (vibrant colors, large nodes)
+- Bridge/ambassador roles (desaturated colors, positioned between clusters)
+- Potential misfits or opportunity nodes (gray-ish appearance)
+- Strong vs. weak relationship ties (thick vs. thin edges)
 

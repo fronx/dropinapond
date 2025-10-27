@@ -83,7 +83,7 @@ def analyze(params: Params) -> Path:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: uv run src/semantic_flow.py <graph_name> [--alpha 0.6] [--cos-min 0.2]")
+        print("Usage: uv run src/semantic_flow.py <graph_name> [--alpha 0.4] [--cos-min 0.25]")
         sys.exit(1)
 
     params = Params(name=sys.argv[1])
