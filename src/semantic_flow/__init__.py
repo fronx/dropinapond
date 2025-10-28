@@ -7,7 +7,7 @@ embeddings in ChromaDB, then compute various fields and metrics.
 """
 
 from .structural import build_structural_matrix
-from .semantic import load_phrase_data, compute_semantic_affinity_matrix
+from .semantic import load_phrase_data, compute_semantic_affinity_matrix, compute_phrase_contribution_breakdown, compute_standout_phrases
 from .blending import blend_matrices, compute_fields
 from .clustering import detect_clusters
 from .suggestions import generate_suggestions
@@ -18,6 +18,8 @@ __all__ = [
     "build_structural_matrix",
     "load_phrase_data",
     "compute_semantic_affinity_matrix",
+    "compute_phrase_contribution_breakdown",
+    "compute_standout_phrases",
     "blend_matrices",
     "compute_fields",
     "detect_clusters",

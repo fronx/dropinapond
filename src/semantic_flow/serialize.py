@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -135,8 +135,10 @@ def build_analysis_output(
     clusters: List[List[str]],
     suggestions: List[Dict],
     nodes: List[str],
-    coherence: Dict = None,
-    phrase_similarities: Dict = None,
+    coherence: Optional[Dict] = None,
+    phrase_similarities: Optional[Dict] = None,
+    phrase_contributions: Optional[Dict] = None,
+    standout_phrases: Optional[Dict] = None,
 ) -> dict:
     """
     Assemble complete analysis output for JSON export.
@@ -156,6 +158,8 @@ def build_analysis_output(
         nodes: Ordered list of node IDs
         coherence: Optional coherence metrics dict
         phrase_similarities: Optional phrase-level similarity data
+        phrase_contributions: Optional phrase contribution breakdown data
+        standout_phrases: Optional network-aware standout phrase data
 
     Returns:
         Complete analysis dict ready for JSON serialization
@@ -181,6 +185,10 @@ def build_analysis_output(
         focal_id = nodes[0] if nodes else None
         if focal_id and focal_id in phrase_similarities:
             metrics["metrics"]["phrase_similarities"] = phrase_similarities[focal_id]
+    if phrase_contributions is not None:
+        metrics["metrics"]["phrase_contributions"] = phrase_contributions
+    if standout_phrases is not None:
+        metrics["metrics"]["standout_phrases"] = standout_phrases
     return metrics
 
 

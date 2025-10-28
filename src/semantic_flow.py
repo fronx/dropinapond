@@ -24,6 +24,8 @@ from semantic_flow import (
     build_structural_matrix,
     load_phrase_data,
     compute_semantic_affinity_matrix,
+    compute_phrase_contribution_breakdown,
+    compute_standout_phrases,
     blend_matrices,
     compute_fields,
     detect_clusters,
@@ -83,8 +85,49 @@ def analyze(params: Params) -> Path:
         similarity_threshold=0.3, top_k=100
     )
 
+    # Compute phrase contributions for each neighbor
+    # This shows which focal phrases contribute most to predictability
+    focal_id = nodes[0]
+    focal_idx = idx[focal_id]
+    phrase_contributions = {}
+    for neighbor_id in nodes[1:]:
+        contributions = compute_phrase_contribution_breakdown(
+            embedding_service, params.name, focal_id, neighbor_id,
+            cos_min=params.cos_min, top_k=10
+        )
+        if contributions:
+            phrase_contributions[neighbor_id] = contributions
+
+    # Compute standout phrases for neighbors with high F_MB
+    # This shows which phrases make a person uniquely stand out in the network
+    standout_phrases = {}
+    neighbor_ids = [n for n in nodes if n != focal_id]
+
+    # Find F_MB threshold (median of non-zero values)
+    f_mb_values = []
+    for neighbor_id in neighbor_ids:
+        neighbor_idx = idx[neighbor_id]
+        f_mb_val = F_MB[focal_idx, neighbor_idx]
+        if f_mb_val > 0:
+            f_mb_values.append(f_mb_val)
+
+    f_mb_threshold = sorted(f_mb_values)[len(f_mb_values) // 2] if f_mb_values else 0.5
+
+    # Compute standout phrases for neighbors above threshold
+    for neighbor_id in neighbor_ids:
+        neighbor_idx = idx[neighbor_id]
+        f_mb_val = F_MB[focal_idx, neighbor_idx]
+
+        if f_mb_val >= f_mb_threshold:
+            standout = compute_standout_phrases(
+                embedding_service, params.name, focal_id, neighbor_id,
+                neighbor_ids, cos_min=params.cos_min, top_k=5
+            )
+            if standout:
+                standout_phrases[neighbor_id] = standout
+
     analysis = build_analysis_output(
-        params.name, vars(params), S, A, W, F, D, F_MB, E_MB, clusters, suggestions, nodes, coherence, phrase_similarities
+        params.name, vars(params), S, A, W, F, D, F_MB, E_MB, clusters, suggestions, nodes, coherence, phrase_similarities, phrase_contributions, standout_phrases
     )
 
     return write_analysis(analysis, out_dir, params.name)

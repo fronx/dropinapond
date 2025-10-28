@@ -11,7 +11,8 @@ import Tag from './Tag';
 export default function SemanticOverlapDetails({
   similarPhrases,
   uniquePersonPhrases,
-  isDarkMode
+  isDarkMode,
+  standoutPhrases = []
 }) {
   const [hoveredTag, setHoveredTag] = useState(null);
 
@@ -56,16 +57,25 @@ export default function SemanticOverlapDetails({
     marginBottom: '4px'
   };
 
+  // Filter out shared interests that are already shown in standout phrases
+  const standoutPhrasesSet = new Set(
+    standoutPhrases.map(sp => sp.phrase.toLowerCase())
+  );
+
+  const filteredSimilarPhrases = similarPhrases.filter(
+    sp => !standoutPhrasesSet.has(sp.neighbor_phrase.toLowerCase())
+  );
+
   return (
     <div style={containerStyle}>
-      {/* Shared interests */}
-      {similarPhrases.length > 0 && (
+      {/* Shared interests (excluding standout phrases) */}
+      {filteredSimilarPhrases.length > 0 && (
         <div style={sectionStyle}>
           <div style={labelStyle}>
-            Shared interests ({similarPhrases.length})
+            Shared interests ({filteredSimilarPhrases.length} total, showing {Math.min(8, filteredSimilarPhrases.length)})
           </div>
           <div style={tagContainerStyle}>
-            {similarPhrases.map((match, idx) => {
+            {filteredSimilarPhrases.slice(0, 8).map((match, idx) => {
               const isExactMatch = match.similarity >= 0.99;
               const isDifferent = match.focal_phrase !== match.neighbor_phrase;
               const showTooltip = hoveredTag === `shared-${idx}` && !isExactMatch && isDifferent;

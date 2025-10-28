@@ -4,11 +4,10 @@ import {
   getSemanticFlowLabel,
   extractSemanticFlowMetrics,
   computeAllPercentiles,
-  getStructuralDescription,
-  getSemanticDistanceDescription,
   getPercentileLabel
 } from '../lib/metricLabels';
 import SemanticOverlapDetails from './SemanticOverlapDetails';
+import Tag from './Tag';
 
 /**
  * Sidebar that appears when clicking a person node.
@@ -255,6 +254,92 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
         </button>
       </div>
 
+      {/* Introductory paragraph for non-focal nodes */}
+      {!isFocalNode && isSemanticFlow && (
+        <div style={{
+          marginBottom: '24px',
+          padding: '16px',
+          backgroundColor: isDarkMode ? '#1f2937' : '#f9fafb',
+          borderRadius: '8px',
+          borderLeft: `4px solid ${isDarkMode ? '#60a5fa' : '#3b82f6'}`,
+        }}>
+          <div style={{
+            fontSize: '0.9375rem',
+            lineHeight: '1.6',
+            color: isDarkMode ? '#e5e7e5' : '#374151',
+          }}>
+            {/* Build intro sentence from metrics */}
+            {(() => {
+              const parts = [];
+
+              // Structural contact
+              if (metrics.structuralEdge !== undefined) {
+                const structuralLabel = getSemanticFlowLabel('structuralEdge', metrics.structuralEdge).label;
+                parts.push(<span key="structural" style={{ textTransform: 'capitalize' }}>{structuralLabel}</span>);
+                parts.push(<span key="with"> contact with </span>);
+              }
+
+              // Semantic affinity (percentile)
+              if (metrics.semanticAffinity !== undefined && percentiles?.semanticAffinity) {
+                const affinityLabel = getPercentileLabel('semanticAffinity', metrics.semanticAffinity, percentiles.semanticAffinity);
+                if (affinityLabel) {
+                  parts.push(<span key="affinity">{affinityLabel.label}</span>);
+                }
+              }
+
+              parts.push(<span key="dot">.</span>);
+
+              return parts;
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Standout phrases - what makes this person special */}
+      {!isFocalNode && isSemanticFlow && analysisData?.metrics?.standout_phrases?.[person.id] && (
+        <div style={{
+          marginBottom: '24px',
+        }}>
+          <div style={{
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            color: isDarkMode ? '#9ca3af' : '#6b7280',
+            marginBottom: '8px'
+          }}>
+            Stands out for
+          </div>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px'
+          }}>
+            {(() => {
+              const standoutPhrases = analysisData.metrics.standout_phrases[person.id];
+              if (!standoutPhrases || standoutPhrases.length === 0) return null;
+
+              // Normalize standout scores to 0-1 range for bar intensity
+              const maxScore = Math.max(...standoutPhrases.map(p => p.standout_score));
+
+              return standoutPhrases.slice(0, 5).map((phrase, idx) => {
+                const intensity = maxScore > 0 ? phrase.standout_score / maxScore : 1.0;
+                return (
+                  <Tag
+                    key={idx}
+                    variant="standout"
+                    similarity={intensity}
+                    isDarkMode={isDarkMode}
+                  >
+                    {phrase.phrase}
+                  </Tag>
+                );
+              });
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* For focal node, show different content */}
       {isFocalNode ? (
         <>
@@ -289,52 +374,6 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
         </>
       ) : isSemanticFlow ? (
         <>
-          {/* Semantic Flow Metrics - Humanized */}
-
-          {/* Relationship Summary */}
-          {(metrics.structuralEdge !== undefined || metrics.semanticAffinity !== undefined) && (
-            <div style={sectionStyle}>
-              <div style={sectionTitleStyle}>Your Connection</div>
-              <div style={{ fontSize: '0.9375rem', lineHeight: '1.6', marginBottom: '0' }}>
-                {metrics.structuralEdge !== undefined && metrics.semanticAffinity !== undefined ? (
-                  <>
-                    <span style={{ textTransform: 'capitalize' }}>
-                      {getSemanticFlowLabel('structuralEdge', metrics.structuralEdge).label}
-                    </span>
-                    {' contact with '}
-                    <span>
-                      {getPercentileLabel('semanticAffinity', metrics.semanticAffinity, percentiles?.semanticAffinity)?.label ||
-                       `${(metrics.semanticAffinity * 100).toFixed(0)}% affinity`}
-                    </span>
-                    {' interests'}
-                    {metrics.effectiveEdge !== undefined && (
-                      <>
-                        {' — '}
-                        <strong>
-                          {getPercentileLabel('effectiveEdge', metrics.effectiveEdge, percentiles?.effectiveEdge)?.label ||
-                           'connection'}
-                        </strong>
-                        {' overall'}
-                      </>
-                    )}
-                    .
-                  </>
-                ) : (
-                  metrics.structuralEdge !== undefined ? (
-                    <span style={{ textTransform: 'capitalize' }}>
-                      {getSemanticFlowLabel('structuralEdge', metrics.structuralEdge).label} contact.
-                    </span>
-                  ) : (
-                    <span style={{ textTransform: 'capitalize' }}>
-                      {getPercentileLabel('semanticAffinity', metrics.semanticAffinity, percentiles?.semanticAffinity)?.label ||
-                       `${(metrics.semanticAffinity * 100).toFixed(0)}% affinity`} interests.
-                    </span>
-                  )
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Mutual Understanding */}
           {(metrics.predictabilityRaw !== undefined || metrics.distanceRaw !== undefined) && (
             <div style={sectionStyle}>
@@ -365,29 +404,72 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
                 similarPhrases={similarPhrases}
                 uniquePersonPhrases={uniquePersonPhrases}
                 isDarkMode={isDarkMode}
+                standoutPhrases={analysisData?.metrics?.standout_phrases?.[person.id] || []}
               />
             </div>
           )}
 
-          {/* In Your Network - neutral descriptions */}
-          {metrics.structuralEdge !== undefined && (
+          {/* Phrase Contributions - What Makes This Person Stand Out */}
+          {!isFocalNode && analysisData?.metrics?.phrase_contributions?.[person.id] && (
             <div style={sectionStyle}>
-              <div style={sectionTitleStyle}>In Your Network</div>
-              <div style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>
-                {/* Structural dimension */}
-                {getStructuralDescription(metrics.structuralEdge) && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <strong>Structurally:</strong> {getStructuralDescription(metrics.structuralEdge)}
-                  </div>
-                )}
-
-                {/* Semantic dimension - use percentiles */}
-                {getSemanticDistanceDescription(metrics.distanceRaw, percentiles?.distanceRaw) && (
-                  <div>
-                    <strong>Semantically:</strong> {getSemanticDistanceDescription(metrics.distanceRaw, percentiles?.distanceRaw)}
-                  </div>
-                )}
+              <div style={sectionTitleStyle}>What Makes {fullPersonData.name} Stand Out</div>
+              <div style={{ fontSize: '0.875rem', lineHeight: '1.6', marginBottom: '12px', color: isDarkMode ? '#9ca3af' : '#6b7280' }}>
+                These are your interests that create the strongest pull toward {fullPersonData.name}.
               </div>
+
+              {(() => {
+                const contributions = analysisData.metrics.phrase_contributions[person.id];
+                if (!contributions || contributions.length === 0) return null;
+
+                // Find max contribution for normalization
+                const maxContribution = Math.max(...contributions.map(c => c.contribution));
+
+                return (
+                  <div>
+                    {contributions.slice(0, 5).map((contrib, idx) => {
+                      const percentage = maxContribution > 0 ? (contrib.contribution / maxContribution) * 100 : 0;
+
+                      return (
+                        <div key={idx} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: idx < Math.min(4, contributions.length - 1) ? `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}` : 'none' }}>
+                          <div style={{ fontWeight: '600', color: isDarkMode ? '#e5e5e5' : '#1f2937', marginBottom: '6px' }}>
+                            {contrib.phrase}
+                          </div>
+
+                          {/* Strength bar */}
+                          <div style={{
+                            width: '100%',
+                            height: '6px',
+                            backgroundColor: isDarkMode ? '#374151' : '#e5e7eb',
+                            borderRadius: '3px',
+                            marginBottom: '8px',
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              width: `${percentage}%`,
+                              height: '100%',
+                              backgroundColor: isDarkMode ? '#93c5fd' : '#3b82f6',
+                              borderRadius: '3px',
+                              transition: 'width 0.3s ease'
+                            }} />
+                          </div>
+
+                          {/* Top matches */}
+                          {contrib.top_matches && contrib.top_matches.length > 0 && (
+                            <div style={{ fontSize: '0.75rem', color: isDarkMode ? '#9ca3af' : '#6b7280', lineHeight: '1.4' }}>
+                              <div style={{ fontWeight: '600', marginBottom: '4px' }}>Resonates with:</div>
+                              {contrib.top_matches.map((match, matchIdx) => (
+                                <div key={matchIdx} style={{ paddingLeft: '8px', marginBottom: '2px' }}>
+                                  • {match.phrase} <span style={{ color: isDarkMode ? '#6b7280' : '#9ca3af' }}>({Math.round(match.similarity * 100)}%)</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

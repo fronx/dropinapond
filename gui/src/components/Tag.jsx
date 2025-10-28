@@ -24,6 +24,29 @@ export default function Tag({
       };
     }
 
+    if (variant === 'standout') {
+      // Standout phrases: yellow/amber colors with left bar indicator
+      // similarity here represents standout intensity (0-1, normalized)
+      const intensity = Math.min(1.0, similarity);
+      const opacity = Math.max(0.8, intensity * 0.2 + 0.8);
+
+      // Left bar width indicates standout strength
+      const barWidth = intensity > 0.8 ? '4px' : intensity > 0.5 ? '3px' : '2px';
+      const barColor = isDarkMode ? '#fbbf24' : '#f59e0b';
+      const bgColor = isDarkMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(251, 191, 36, 0.15)';
+
+      // Create a gradient that makes a vertical bar on the left
+      const backgroundImage = `linear-gradient(to right, ${barColor} 0%, ${barColor} ${barWidth}, ${bgColor} ${barWidth}, ${bgColor} 100%)`;
+
+      return {
+        border: `1px solid ${isDarkMode ? '#f59e0b' : '#fbbf24'}`,
+        backgroundImage: backgroundImage,
+        color: isDarkMode ? '#fef3c7' : '#92400e',
+        opacity: opacity,
+        cursor: 'default'
+      };
+    }
+
     // Shared phrases: blue colors with left bar indicator
     const isExactMatch = similarity >= 0.99;
     const opacity = Math.max(0.7, similarity * 0.3 + 0.7);
