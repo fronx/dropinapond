@@ -5,7 +5,8 @@ import {
   extractSemanticFlowMetrics,
   computeAllPercentiles,
   getStructuralDescription,
-  getSemanticDistanceDescription
+  getSemanticDistanceDescription,
+  getPercentileLabel
 } from '../lib/metricLabels';
 
 /**
@@ -299,13 +300,17 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
                     </span>
                     {' contact with '}
                     <span>
-                      {getSemanticFlowLabel('semanticAffinity', metrics.semanticAffinity).label}
+                      {getPercentileLabel('semanticAffinity', metrics.semanticAffinity, percentiles?.semanticAffinity)?.label ||
+                       `${(metrics.semanticAffinity * 100).toFixed(0)}% affinity`}
                     </span>
                     {' interests'}
                     {metrics.effectiveEdge !== undefined && (
                       <>
                         {' — '}
-                        <strong>{getSemanticFlowLabel('effectiveEdge', metrics.effectiveEdge).label}</strong>
+                        <strong>
+                          {getPercentileLabel('effectiveEdge', metrics.effectiveEdge, percentiles?.effectiveEdge)?.label ||
+                           'connection'}
+                        </strong>
                         {' overall'}
                       </>
                     )}
@@ -318,7 +323,8 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
                     </span>
                   ) : (
                     <span style={{ textTransform: 'capitalize' }}>
-                      {getSemanticFlowLabel('semanticAffinity', metrics.semanticAffinity).label} interests.
+                      {getPercentileLabel('semanticAffinity', metrics.semanticAffinity, percentiles?.semanticAffinity)?.label ||
+                       `${(metrics.semanticAffinity * 100).toFixed(0)}% affinity`} interests.
                     </span>
                   )
                 )}
@@ -333,11 +339,21 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
               <div style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>
                 {metrics.predictabilityRaw !== undefined && (
                   <div style={{ marginBottom: metrics.distanceRaw !== undefined ? '8px' : '0' }}>
-                    <strong style={{ textTransform: 'capitalize' }}>
-                      {getSemanticFlowLabel('predictabilityRaw', metrics.predictabilityRaw).label}
-                    </strong>
-                    {' — '}
-                    {getSemanticFlowLabel('predictabilityRaw', metrics.predictabilityRaw).interpretation.toLowerCase()}
+                    {(() => {
+                      const predLabel = getPercentileLabel('predictabilityRaw', metrics.predictabilityRaw, percentiles?.predictabilityRaw);
+                      if (predLabel) {
+                        return (
+                          <>
+                            <strong style={{ textTransform: 'capitalize' }}>
+                              {predLabel.label}
+                            </strong>
+                            {' — '}
+                            {predLabel.interpretation.toLowerCase()}
+                          </>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
                 {metrics.distanceRaw !== undefined && (

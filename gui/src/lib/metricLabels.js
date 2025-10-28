@@ -35,7 +35,10 @@ export function getMetricLabel(metricName, value) {
 }
 
 /**
- * Get human-readable interpretation of semantic flow metrics
+ * Get human-readable interpretation of semantic flow metrics with absolute thresholds.
+ * Only use for metrics with clear absolute meaning or good natural spread.
+ * For narrow-range metrics, use getPercentileLabel() instead.
+ *
  * @param {string} metricName - Name of the semantic flow metric
  * @param {number} value - The metric value
  * @returns {{label: string, description: string, interpretation: string}} Metric information
@@ -45,6 +48,7 @@ export function getSemanticFlowLabel(metricName, value) {
     return { label: 'N/A', description: 'No data available', interpretation: '' };
   }
 
+  // Only include metrics with absolute meaning or good natural spread
   const interpretations = {
     structuralEdge: [
       { max: 0.2, label: 'minimal contact', description: 'Very little actual interaction', interpretation: 'You rarely interact with this person in practice.' },
@@ -53,47 +57,12 @@ export function getSemanticFlowLabel(metricName, value) {
       { max: 0.8, label: 'frequent', description: 'Strong and frequent interaction', interpretation: 'You interact frequently and consistently.' },
       { max: 1.0, label: 'primary', description: 'Very high interaction level', interpretation: 'This is one of your primary relationships.' },
     ],
-    semanticAffinity: [
-      { max: 0.2, label: 'distinct topics', description: 'Very different conceptual focus', interpretation: 'Your topics and theirs have little conceptual overlap.' },
-      { max: 0.4, label: 'somewhat aligned', description: 'Some semantic resonance', interpretation: 'You share some conceptual territory, but still quite different.' },
-      { max: 0.6, label: 'good alignment', description: 'Significant thematic overlap', interpretation: 'Your interests and theirs align well on key themes.' },
-      { max: 0.8, label: 'strong resonance', description: 'High semantic overlap', interpretation: 'Strong conceptual resonance - you think about similar things.' },
-      { max: 1.0, label: 'deep alignment', description: 'Very high semantic affinity', interpretation: 'Deep thematic alignment - almost identical conceptual focus.' },
-    ],
-    effectiveEdge: [
-      { max: 0.2, label: 'weak link', description: 'Low combined weight', interpretation: 'Both structure and meaning suggest a weak connection.' },
-      { max: 0.4, label: 'moderate link', description: 'Some combined strength', interpretation: 'A moderate connection when structure and meaning combine.' },
-      { max: 0.6, label: 'solid link', description: 'Good combined strength', interpretation: 'A solid connection - structure and meaning reinforce each other.' },
-      { max: 0.8, label: 'strong link', description: 'High blended weight', interpretation: 'A strong link where actual interaction and semantic fit align well.' },
-      { max: 1.0, label: 'primary link', description: 'Very high combined strength', interpretation: 'One of your strongest links by both practice and meaning.' },
-    ],
-    predictabilityRaw: [
-      { max: 0.2, label: 'one-sided pull', description: 'Very asymmetric affinity', interpretation: 'The semantic pull is mostly one-way - little mutual resonance.' },
-      { max: 0.4, label: 'moderate reciprocity', description: 'Some mutual pull', interpretation: 'There\'s some mutual semantic pull, but not strongly balanced.' },
-      { max: 0.6, label: 'balanced pull', description: 'Good mutual predictability', interpretation: 'Good reciprocity - you both pull toward each other conceptually.' },
-      { max: 0.8, label: 'strong reciprocity', description: 'High mutual affinity', interpretation: 'Strong mutual pull - collaboration feels natural and balanced.' },
-      { max: 1.0, label: 'deep reciprocity', description: 'Very high mutual pull', interpretation: 'Deep reciprocal resonance - you can easily anticipate each other.' },
-    ],
     distanceRaw: [
       { max: 0.2, label: 'very close', description: 'Centers of gravity nearly aligned', interpretation: 'Your semantic centers are very close - you occupy similar conceptual space.' },
       { max: 0.4, label: 'nearby', description: 'Close but distinct centers', interpretation: 'Close enough to share territory but with distinct focuses.' },
       { max: 0.6, label: 'moderate gap', description: 'Significant separation', interpretation: 'There\'s a moderate gap between your conceptual centers.' },
       { max: 0.8, label: 'far apart', description: 'Large semantic distance', interpretation: 'Your conceptual centers are quite far apart.' },
       { max: 1.0, label: 'very distant', description: 'Very different semantic fields', interpretation: 'You occupy very different parts of semantic space.' },
-    ],
-    predictabilityBlanket: [
-      { max: 0.04, label: 'lost in noise', description: 'Very low relative coupling', interpretation: 'Among all your options, this connection barely registers.' },
-      { max: 0.07, label: 'one of many', description: 'Low relative prominence', interpretation: 'This is just one of many possible attention targets for both of you.' },
-      { max: 0.10, label: 'noticeable', description: 'Moderate relative coupling', interpretation: 'This relationship stands out somewhat from your other options.' },
-      { max: 0.15, label: 'prominent', description: 'High relative coupling', interpretation: 'Given all your options, this connection is quite prominent.' },
-      { max: 1.0, label: 'magnetic', description: 'Very high relative coupling', interpretation: 'This relationship strongly stands out - you pull toward each other despite many options.' },
-    ],
-    explorationPotential: [
-      { max: 0.02, label: 'high friction', description: 'Low-opportunity terrain', interpretation: 'A next step here would require significant effort or feel awkward.' },
-      { max: 0.035, label: 'some friction', description: 'Moderate barriers to next step', interpretation: 'There\'s some opportunity here but with noticeable friction.' },
-      { max: 0.05, label: 'smooth path', description: 'Good opportunity surface', interpretation: 'A next step would feel relatively natural and low-effort.' },
-      { max: 0.08, label: 'easy opening', description: 'High opportunity potential', interpretation: 'Easy, low-friction opportunity - a natural next step is obvious.' },
-      { max: 1.0, label: 'ripe opportunity', description: 'Optimal exploration potential', interpretation: 'Prime opportunity - strong coupling and close distance make this very easy.' },
     ],
     fitRatio: [
       { max: 0.5, label: 'strong bridge', description: 'Couples more outside than inside', interpretation: 'This person is a bridge or ambassador - they connect to other clusters more than their own.' },
@@ -171,6 +140,8 @@ export function computeMetricPercentiles(metricName, analysisData, egoId) {
 
   if (metricName === 'semanticAffinity' && analysisData.metrics.layers?.semantic_affinity?.[egoId]) {
     Object.values(analysisData.metrics.layers.semantic_affinity[egoId]).forEach(v => values.push(v));
+  } else if (metricName === 'effectiveEdge' && analysisData.metrics.layers?.effective_edges?.[egoId]) {
+    Object.values(analysisData.metrics.layers.effective_edges[egoId]).forEach(v => values.push(v));
   } else if (metricName === 'predictabilityRaw' && analysisData.metrics.fields?.edge_fields?.[egoId]) {
     Object.values(analysisData.metrics.fields.edge_fields[egoId]).forEach(obj => values.push(obj.predictability_raw));
   } else if (metricName === 'distanceRaw' && analysisData.metrics.fields?.edge_fields?.[egoId]) {
@@ -204,6 +175,7 @@ export function computeAllPercentiles(analysisData, egoId) {
 
   return {
     semanticAffinity: computeMetricPercentiles('semanticAffinity', analysisData, egoId),
+    effectiveEdge: computeMetricPercentiles('effectiveEdge', analysisData, egoId),
     predictabilityRaw: computeMetricPercentiles('predictabilityRaw', analysisData, egoId),
     distanceRaw: computeMetricPercentiles('distanceRaw', analysisData, egoId),
     predictabilityBlanket: computeMetricPercentiles('predictabilityBlanket', analysisData, egoId),
@@ -241,6 +213,65 @@ export function getSemanticDistanceDescription(distance, percentiles) {
   if (distance <= percentiles.p60) return 'Moderate distance in conceptual space.';
   if (distance <= percentiles.p80) return 'Further than most in your network.';
   return 'Among your most distant in conceptual space.';
+}
+
+/**
+ * Get percentile-based labels for metrics with narrow natural ranges.
+ * Use this for metrics that cluster tightly and need relative interpretation.
+ *
+ * @param {string} metricName - Name of the metric
+ * @param {number} value - The metric value
+ * @param {Object} percentiles - Percentiles for this metric {p20, p40, p60, p80}
+ * @returns {{label: string, interpretation: string}|null} Label and interpretation or null if not enough data
+ */
+export function getPercentileLabel(metricName, value, percentiles) {
+  if (value === undefined || value === null || !percentiles) return null;
+
+  const labelDefinitions = {
+    semanticAffinity: [
+      { label: 'quite different topics', interpretation: 'Your conceptual focuses are further apart than most of your connections.' },
+      { label: 'somewhat aligned', interpretation: 'You share some conceptual territory, though not as much as your closer connections.' },
+      { label: 'good alignment', interpretation: 'Your interests align well - typical for your network.' },
+      { label: 'strong resonance', interpretation: 'Stronger conceptual overlap than most of your connections.' },
+      { label: 'exceptional alignment', interpretation: 'Among your closest semantic matches - you think about very similar things.' },
+    ],
+    predictabilityRaw: [
+      { label: 'lower mutual pull', interpretation: 'The semantic pull between you is weaker than most of your connections.' },
+      { label: 'moderate reciprocity', interpretation: 'There\'s mutual semantic pull, though not as strong as your top connections.' },
+      { label: 'balanced pull', interpretation: 'Good reciprocity - you both pull toward each other conceptually.' },
+      { label: 'strong reciprocity', interpretation: 'Strong mutual pull - collaboration feels natural and balanced.' },
+      { label: 'exceptional reciprocity', interpretation: 'Among your strongest mutual connections - you can easily anticipate each other.' },
+    ],
+    effectiveEdge: [
+      { label: 'weaker link', interpretation: 'Structure and meaning combine to make this a less prominent connection.' },
+      { label: 'moderate link', interpretation: 'A moderate connection when structure and meaning combine.' },
+      { label: 'solid link', interpretation: 'A solid connection where structure and meaning reinforce each other.' },
+      { label: 'strong link', interpretation: 'Among your stronger links by both practice and semantic fit.' },
+      { label: 'primary link', interpretation: 'One of your strongest links by both practice and meaning.' },
+    ],
+    predictabilityBlanket: [
+      { label: 'quieter signal', interpretation: 'Given all your options, this connection is less prominent than most.' },
+      { label: 'one of many', interpretation: 'This is one of several comparable attention targets.' },
+      { label: 'noticeable', interpretation: 'This relationship stands out somewhat from your other options.' },
+      { label: 'prominent', interpretation: 'This connection is quite prominent among all your options.' },
+      { label: 'magnetic', interpretation: 'This relationship strongly stands out - you pull toward each other despite many options.' },
+    ],
+    explorationPotential: [
+      { label: 'higher friction', interpretation: 'A next step here has more friction than most of your options.' },
+      { label: 'some friction', interpretation: 'There\'s opportunity here but with moderate friction.' },
+      { label: 'smooth path', interpretation: 'A next step would feel relatively natural.' },
+      { label: 'easy opening', interpretation: 'Among your easier opportunities - a natural next step is clear.' },
+      { label: 'ripe opportunity', interpretation: 'One of your ripest opportunities - very low friction and high potential.' },
+    ],
+  };
+
+  const labels = labelDefinitions[metricName];
+  if (!labels) return null;
+
+  // Find which quintile bucket the value falls into
+  const thresholds = [percentiles.p20, percentiles.p40, percentiles.p60, percentiles.p80];
+  const bucketIndex = thresholds.findIndex(threshold => value <= threshold);
+  return labels[bucketIndex === -1 ? 4 : bucketIndex];
 }
 
 /**
