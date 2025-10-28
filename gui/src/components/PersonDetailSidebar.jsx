@@ -8,6 +8,7 @@ import {
   getSemanticDistanceDescription,
   getPercentileLabel
 } from '../lib/metricLabels';
+import SemanticOverlapDetails from './SemanticOverlapDetails';
 
 /**
  * Sidebar that appears when clicking a person node.
@@ -356,6 +357,14 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
                   </div>
                 )}
               </div>
+
+              {/* Show phrase-level data that underlies these metrics */}
+              <SemanticOverlapDetails
+                similarPhrases={similarPhrases}
+                uniquePersonPhrases={uniquePersonPhrases}
+                uniqueSelfPhrases={uniqueSelfPhrases}
+                isDarkMode={isDarkMode}
+              />
             </div>
           )}
 

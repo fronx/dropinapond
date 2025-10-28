@@ -136,6 +136,7 @@ def build_analysis_output(
     suggestions: List[Dict],
     nodes: List[str],
     coherence: Dict = None,
+    phrase_similarities: Dict = None,
 ) -> dict:
     """
     Assemble complete analysis output for JSON export.
@@ -153,6 +154,8 @@ def build_analysis_output(
         clusters: List of node clusters
         suggestions: List of suggestion dicts
         nodes: Ordered list of node IDs
+        coherence: Optional coherence metrics dict
+        phrase_similarities: Optional phrase-level similarity data
 
     Returns:
         Complete analysis dict ready for JSON serialization
@@ -173,6 +176,11 @@ def build_analysis_output(
     }
     if coherence is not None:
         metrics["metrics"]["coherence"] = coherence
+    if phrase_similarities is not None:
+        # Extract just the focal node's similarities (first node in nodes list)
+        focal_id = nodes[0] if nodes else None
+        if focal_id and focal_id in phrase_similarities:
+            metrics["metrics"]["phrase_similarities"] = phrase_similarities[focal_id]
     return metrics
 
 

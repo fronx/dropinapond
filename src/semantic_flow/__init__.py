@@ -11,6 +11,7 @@ from .semantic import load_phrase_data, compute_semantic_affinity_matrix
 from .blending import blend_matrices, compute_fields
 from .clustering import detect_clusters
 from .suggestions import generate_suggestions
+from .phrase_similarities import compute_all_phrase_similarities
 from .serialize import build_analysis_output, write_analysis
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "compute_fields",
     "detect_clusters",
     "generate_suggestions",
+    "compute_all_phrase_similarities",
     "build_analysis_output",
     "write_analysis",
 ]

@@ -28,6 +28,7 @@ from semantic_flow import (
     compute_fields,
     detect_clusters,
     generate_suggestions,
+    compute_all_phrase_similarities,
     build_analysis_output,
     write_analysis,
 )
@@ -74,8 +75,14 @@ def analyze(params: Params) -> Path:
     # Compute coherence using existing clusters as basis
     coherence = compute_semantic_coherence(nodes, clusters, F, D, F_MB)
 
+    # Compute phrase-level similarities for UI display
+    phrase_similarities = compute_all_phrase_similarities(
+        embedding_service, params.name, nodes,
+        similarity_threshold=params.cos_min, top_k=10
+    )
+
     analysis = build_analysis_output(
-        params.name, vars(params), S, A, W, F, D, F_MB, E_MB, clusters, suggestions, nodes, coherence
+        params.name, vars(params), S, A, W, F, D, F_MB, E_MB, clusters, suggestions, nodes, coherence, phrase_similarities
     )
 
     return write_analysis(analysis, out_dir, params.name)
