@@ -171,6 +171,12 @@ def load_ego_graph(
             for i, p in enumerate(phrases)
         }
 
+        # Prepare metadata with weights for ChromaDB storage
+        phrase_metadata = [
+            {"weight": p.get("weight", 1.0)}
+            for p in phrases
+        ]
+
         # Check if phrases already exist
         try:
             existing_embeddings = embedding_service.get_embeddings(graph_name, phrase_ids)
@@ -180,7 +186,8 @@ def load_ego_graph(
                     graph_name=graph_name,
                     node_id=node_id,
                     phrases=phrase_texts,
-                    phrase_ids=phrase_ids
+                    phrase_ids=phrase_ids,
+                    metadata=phrase_metadata
                 )
         except:
             # Add all phrases
@@ -188,7 +195,8 @@ def load_ego_graph(
                 graph_name=graph_name,
                 node_id=node_id,
                 phrases=phrase_texts,
-                phrase_ids=phrase_ids
+                phrase_ids=phrase_ids,
+                metadata=phrase_metadata
             )
 
         # Compute weighted mean embedding
