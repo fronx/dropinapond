@@ -29,11 +29,12 @@ Then you're structuring that into JSON files as you go.
 - **Names** → create/update person nodes
 - **What people care about** → their phrases and semantic fields
 - **Relationship texture** → how they actually interact, not just connection strength
-- **Shared ground** → when they describe qualities or interests they share with someone, that goes in BOTH people's phrases (theirs AND self.json)
 - **Network structure** → who introduced whom, who knows whom, what clusters exist
 - **What the user cares about** → everything they tell you reveals their own interests (update self.json!)
 
-Key insight: When they tell you "I worked as a freelancer for X" or "We both love Y," that's information about THEM too. Don't just update the other person - update self.json with what you're learning about the focal node.
+**Watch for shared interests:** When the user describes someone else, notice if they're also revealing something about themselves. "We both love hiking" or "She's also into energy tracking" or "He's another freelancer" - these signal shared ground. If it's explicit, add to both files. If it's implicit or unclear, ask: "Sounds like that's something you're interested in too?"
+
+**Key insight:** When they tell you about someone, they're often revealing connection points between themselves and that person. Stay curious about what's shared vs. what's just observed about the other person.
 
 ## What goes in the files
 
@@ -46,6 +47,8 @@ Key insight: When they tell you "I worked as a freelancer for X" or "We both lov
 - Capabilities: skills they could help with
 - Availability: timestamped observations about their availability (score 0-1)
 - Notes: personality, interaction quality, relationship dynamics
+
+**Phrase granularity:** Break phrases down to minimal semantic units. Avoid compound phrases like "health awareness and energy tracking" - split into separate phrases: "energy tracking" and "health awareness". This enables direct phrase matching across the network. It's fine to keep longer phrases when something truly specific needs to be distinguished and would lose meaning if shortened, but that should be the exception.
 
 **edges.json** (relationships):
 - Connection strength on 0-1 scale: 0.9-1.0 (very close), 0.7-0.8 (regular), 0.5-0.6 (occasional), 0.3-0.4 (distant), 0.1-0.2 (barely connected)
