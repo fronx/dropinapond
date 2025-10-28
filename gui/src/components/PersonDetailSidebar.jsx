@@ -375,9 +375,16 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
       ) : isSemanticFlow ? (
         <>
           {/* Mutual Understanding */}
-          {(metrics.predictabilityRaw !== undefined || metrics.distanceRaw !== undefined) && (
+          {(metrics.predictabilityRaw !== undefined || metrics.distanceRaw !== undefined) && (            
             <div style={sectionStyle}>
-              <div style={sectionTitleStyle}>Mutual Understanding</div>
+              {/* Show phrase-level data that underlies these metrics */}
+              <SemanticOverlapDetails
+                similarPhrases={similarPhrases}
+                uniquePersonPhrases={uniquePersonPhrases}
+                isDarkMode={isDarkMode}
+                standoutPhrases={analysisData?.metrics?.standout_phrases?.[person.id] || []}
+              />
+              {/* <div style={sectionTitleStyle}>Mutual Understanding</div>
               <div style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>
                 {metrics.predictabilityRaw !== undefined && (
                   <div style={{ marginBottom: metrics.distanceRaw !== undefined ? '8px' : '0' }}>
@@ -397,15 +404,7 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
                     {getSemanticFlowLabel('distanceRaw', metrics.distanceRaw).interpretation}
                   </div>
                 )}
-              </div>
-
-              {/* Show phrase-level data that underlies these metrics */}
-              <SemanticOverlapDetails
-                similarPhrases={similarPhrases}
-                uniquePersonPhrases={uniquePersonPhrases}
-                isDarkMode={isDarkMode}
-                standoutPhrases={analysisData?.metrics?.standout_phrases?.[person.id] || []}
-              />
+              </div> */}
             </div>
           )}
 
