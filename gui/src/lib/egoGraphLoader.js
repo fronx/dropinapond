@@ -1,4 +1,5 @@
 import distinctColors from 'distinct-colors';
+import chroma from 'chroma-js';
 
 // Generate visually distinct colors for clusters
 function generateClusterColors(count) {
@@ -260,7 +261,13 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
       const edgeKey = `${source}->${target}`;
       const isHighlighted = highlightedEdges.has(edgeKey);
 
-      // Style highlighted edges differently
+      // Check if both nodes are in the same cluster
+      const sourceCluster = clusterMap.get(source);
+      const targetCluster = clusterMap.get(target);
+      const sameCluster = sourceCluster && targetCluster &&
+        sourceCluster.clusterIndex === targetCluster.clusterIndex;
+
+      // Style edges based on cluster membership and highlighting
       let strokeColor;
       let strokeWidth;
 
@@ -268,6 +275,11 @@ export function parseEgoGraphForFlow(egoData, analysisData) {
         // Highlighted edges: bright blue
         strokeColor = 'rgba(59, 130, 246, 0.9)';
         strokeWidth = Math.max(2.5, effectiveWeight * 20);
+      } else if (sameCluster) {
+        // Edges within the same cluster: use cluster color with transparency
+        const alpha = 0.1 + effectiveWeight * 0.7;
+        strokeColor = chroma(sourceCluster.color).alpha(alpha).css();
+        strokeWidth = Math.max(1, effectiveWeight * 20);
       } else {
         // Default: subtle gray
         strokeColor = `rgba(100, 100, 100, ${0.3 + effectiveWeight * 0.4})`;
