@@ -92,9 +92,11 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
   const personPhrases = fullPersonData.phrases || [];
 
   // Get pre-computed phrase similarities from backend analysis (embedding-based, not word overlap!)
-  const similarPhrases = !isFocalNode && analysisData?.metrics?.phrase_similarities?.[person.id]
+  // Filter by similarity >= 0.65 threshold (below this is considered "unique")
+  const allPhrases = !isFocalNode && analysisData?.metrics?.phrase_similarities?.[person.id]
     ? analysisData.metrics.phrase_similarities[person.id]
     : [];
+  const similarPhrases = allPhrases.filter(match => match.similarity >= 0.65);
 
   // Find unique phrases (those not in similar pairs)
   const getUniquePhrases = (phrases, similarPairs, isFromSelf) => {

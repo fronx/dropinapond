@@ -76,9 +76,11 @@ def analyze(params: Params) -> Path:
     coherence = compute_semantic_coherence(nodes, clusters, F, D, F_MB)
 
     # Compute phrase-level similarities for UI display
+    # Use 0.3 threshold to catch all potential matches, return top 100
+    # GUI will filter by similarity >= 0.65 for "shared" vs "unique"
     phrase_similarities = compute_all_phrase_similarities(
         embedding_service, params.name, nodes,
-        similarity_threshold=params.cos_min, top_k=10
+        similarity_threshold=0.3, top_k=100
     )
 
     analysis = build_analysis_output(
