@@ -362,7 +362,6 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
               <SemanticOverlapDetails
                 similarPhrases={similarPhrases}
                 uniquePersonPhrases={uniquePersonPhrases}
-                uniqueSelfPhrases={uniqueSelfPhrases}
                 isDarkMode={isDarkMode}
               />
             </div>

@@ -1,135 +1,116 @@
-import React from 'react';
+import { useState } from 'react';
+import Tag from './Tag';
 
 /**
- * Displays the phrase-level semantic overlap between focal node and selected person.
- * Shows what connects them (similar phrases) and what's unique to each.
+ * Displays phrase-level semantic overlap as flowing tags.
+ * Visual indicators:
+ * - Left border thickness = how similar (thick = exact match, thin = partial)
+ * - Opacity = semantic similarity strength
+ * - Hover = shows your matching phrase if different
  */
 export default function SemanticOverlapDetails({
   similarPhrases,
   uniquePersonPhrases,
-  uniqueSelfPhrases,
   isDarkMode
 }) {
+  const [hoveredTag, setHoveredTag] = useState(null);
+
+  const containerStyle = {
+    marginTop: '12px'
+  };
+
+  const sectionStyle = {
+    marginBottom: '16px'
+  };
+
+  const tagContainerStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    marginTop: '8px'
+  };
+
+  const tooltipStyle = {
+    position: 'absolute',
+    bottom: '100%',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    marginBottom: '8px',
+    padding: '6px 10px',
+    backgroundColor: isDarkMode ? '#111827' : '#1f2937',
+    color: '#e5e7eb',
+    fontSize: '0.75rem',
+    borderRadius: '6px',
+    whiteSpace: 'nowrap',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    zIndex: 1000,
+    pointerEvents: 'none'
+  };
+
   const labelStyle = {
     fontSize: '0.75rem',
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     color: isDarkMode ? '#9ca3af' : '#6b7280',
-    marginBottom: '8px'
-  };
-
-  const phraseListStyle = {
-    marginTop: '8px',
-    padding: '8px',
-    backgroundColor: isDarkMode ? '#1f2937' : '#f9fafb',
-    borderRadius: '4px',
-    fontSize: '0.8125rem',
-    color: isDarkMode ? '#d1d5db' : '#374151'
+    marginBottom: '4px'
   };
 
   return (
-    <>
-      {/* What connects you */}
+    <div style={containerStyle}>
+      {/* Shared interests */}
       {similarPhrases.length > 0 && (
-        <>
-          <div style={{ ...labelStyle, marginTop: '12px' }}>
-            What connects you ({similarPhrases.length})
+        <div style={sectionStyle}>
+          <div style={labelStyle}>
+            Shared interests ({similarPhrases.length})
           </div>
-          <div style={phraseListStyle}>
-            {similarPhrases.slice(0, 8).map((match, idx) => (
-              <div
-                key={idx}
-                style={{
-                  marginBottom: '8px',
-                  paddingBottom: '8px',
-                  borderBottom: idx < Math.min(7, similarPhrases.length - 1)
-                    ? `1px solid ${isDarkMode ? '#374151' : '#e5e7eb'}`
-                    : 'none'
-                }}
-              >
-                <div style={{
-                  color: isDarkMode ? '#93c5fd' : '#1e40af',
-                  fontWeight: '600',
-                  fontSize: '0.75rem'
-                }}>
-                  You: {match.focal_phrase}
-                </div>
-                <div style={{
-                  color: isDarkMode ? '#d1d5db' : '#4b5563',
-                  fontSize: '0.75rem'
-                }}>
-                  Them: {match.neighbor_phrase}
-                </div>
-                <div style={{
-                  color: isDarkMode ? '#6b7280' : '#9ca3af',
-                  fontSize: '0.7rem',
-                  marginTop: '2px'
-                }}>
-                  {Math.round(match.similarity * 100)}% semantic similarity
-                </div>
-              </div>
-            ))}
-            {similarPhrases.length > 8 && (
-              <div style={{
-                marginTop: '8px',
-                color: isDarkMode ? '#6b7280' : '#9ca3af',
-                fontSize: '0.75rem'
-              }}>
-                ...and {similarPhrases.length - 8} more overlaps
-              </div>
-            )}
+          <div style={tagContainerStyle}>
+            {similarPhrases.map((match, idx) => {
+              const isExactMatch = match.similarity >= 0.99;
+              const isDifferent = match.focal_phrase !== match.neighbor_phrase;
+              const showTooltip = hoveredTag === `shared-${idx}` && !isExactMatch && isDifferent;
+
+              return (
+                <Tag
+                  key={idx}
+                  variant="shared"
+                  similarity={match.similarity}
+                  isDarkMode={isDarkMode}
+                  onMouseEnter={() => setHoveredTag(`shared-${idx}`)}
+                  onMouseLeave={() => setHoveredTag(null)}
+                >
+                  {match.neighbor_phrase}
+                  {showTooltip && (
+                    <div style={tooltipStyle}>
+                      Your phrase: {match.focal_phrase}
+                    </div>
+                  )}
+                </Tag>
+              );
+            })}
           </div>
-        </>
+        </div>
       )}
 
-      {/* What's unique to them */}
+      {/* Unique to them */}
       {uniquePersonPhrases.length > 0 && (
-        <>
-          <div style={{ ...labelStyle, marginTop: '12px' }}>
-            What's unique to them (top 5)
+        <div style={sectionStyle}>
+          <div style={labelStyle}>
+            Unique to them (top {Math.min(10, uniquePersonPhrases.length)})
           </div>
-          <div style={phraseListStyle}>
-            {uniquePersonPhrases.slice(0, 5).map((phrase, idx) => (
-              <div key={idx}>
-                • {phrase.text}
-                {phrase.weight && (
-                  <span style={{
-                    color: isDarkMode ? '#6b7280' : '#9ca3af',
-                    marginLeft: '4px'
-                  }}>
-                    ({phrase.weight.toFixed(2)})
-                  </span>
-                )}
-              </div>
+          <div style={tagContainerStyle}>
+            {uniquePersonPhrases.slice(0, 10).map((phrase, idx) => (
+              <Tag
+                key={idx}
+                variant="unique"
+                isDarkMode={isDarkMode}
+              >
+                {phrase.text}
+              </Tag>
             ))}
           </div>
-        </>
+        </div>
       )}
-
-      {/* What's unique to you */}
-      {uniqueSelfPhrases.length > 0 && (
-        <>
-          <div style={{ ...labelStyle, marginTop: '12px' }}>
-            What's unique to you (top 5)
-          </div>
-          <div style={phraseListStyle}>
-            {uniqueSelfPhrases.slice(0, 5).map((phrase, idx) => (
-              <div key={idx}>
-                • {phrase.text}
-                {phrase.weight && (
-                  <span style={{
-                    color: isDarkMode ? '#6b7280' : '#9ca3af',
-                    marginLeft: '4px'
-                  }}>
-                    ({phrase.weight.toFixed(2)})
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </>
+    </div>
   );
 }
