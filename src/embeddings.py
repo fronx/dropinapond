@@ -252,6 +252,25 @@ class EmbeddingService:
             w = w / w.sum()  # Normalize
             return (embeddings.T @ w)
 
+    def delete_phrases(
+        self,
+        graph_name: str,
+        phrase_ids: List[str]
+    ):
+        """
+        Delete specific phrases from the collection.
+
+        Args:
+            graph_name: Name of the ego graph
+            phrase_ids: List of phrase IDs to delete
+        """
+        if not phrase_ids:
+            return
+
+        collection = self.get_or_create_collection(graph_name)
+        collection.delete(ids=phrase_ids)
+        logger.info(f"Deleted {len(phrase_ids)} phrases from {graph_name}")
+
     def delete_collection(self, graph_name: str):
         """
         Delete a collection (useful for testing or cleanup).

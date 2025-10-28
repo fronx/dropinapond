@@ -177,26 +177,36 @@ def load_ego_graph(
             for p in phrases
         ]
 
-        # Check if phrases already exist
+        # Get all existing phrases for this node from ChromaDB
         try:
-            existing_embeddings = embedding_service.get_embeddings(graph_name, phrase_ids)
-            if len(existing_embeddings) != len(phrase_ids):
-                # Some missing, add them
-                embedding_service.add_phrases(
-                    graph_name=graph_name,
-                    node_id=node_id,
-                    phrases=phrase_texts,
-                    phrase_ids=phrase_ids,
-                    metadata=phrase_metadata
-                )
+            existing_phrases = embedding_service.get_all_node_phrases(graph_name, node_id)
+            existing_ids = set(existing_phrases.keys())
         except:
-            # Add all phrases
+            existing_ids = set()
+
+        # Current phrase IDs from JSON
+        current_ids = set(phrase_ids)
+
+        # Delete stale phrases (exist in ChromaDB but not in current JSON)
+        stale_ids = existing_ids - current_ids
+        if stale_ids:
+            embedding_service.delete_phrases(graph_name, list(stale_ids))
+
+        # Add new phrases (exist in JSON but not in ChromaDB)
+        new_ids = current_ids - existing_ids
+        if new_ids:
+            # Find indices of new phrases to add
+            new_indices = [i for i, pid in enumerate(phrase_ids) if pid in new_ids]
+            new_texts = [phrase_texts[i] for i in new_indices]
+            new_ids_list = [phrase_ids[i] for i in new_indices]
+            new_metadata = [phrase_metadata[i] for i in new_indices]
+
             embedding_service.add_phrases(
                 graph_name=graph_name,
                 node_id=node_id,
-                phrases=phrase_texts,
-                phrase_ids=phrase_ids,
-                metadata=phrase_metadata
+                phrases=new_texts,
+                phrase_ids=new_ids_list,
+                metadata=new_metadata
             )
 
         # Compute weighted mean embedding
