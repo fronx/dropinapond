@@ -8,7 +8,6 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { PersonNode } from './PersonNode';
-import { AnalysisPanel } from './AnalysisPanel';
 import { PersonDetailSidebar } from './PersonDetailSidebar';
 import { loadEgoGraph, loadLatestAnalysis, parseEgoGraphForFlow } from '../lib/egoGraphLoader';
 import { createForceSimulation } from '../lib/d3Layout';
@@ -152,16 +151,6 @@ export function EgoGraphView() {
           egoGraphData={egoGraphData}
           analysisData={analysisData}
           onClose={() => setSelectedPerson(null)}
-        />
-      )}
-
-      {/* Analysis Panel (right side) */}
-      {analysisData && (
-        <AnalysisPanel
-          clusterMetrics={analysisData.clusterMetrics}
-          overallMetrics={analysisData.overallMetrics}
-          recommendations={analysisData.recommendations}
-          nodeNameMap={analysisData.nodeNameMap}
         />
       )}
     </div>
