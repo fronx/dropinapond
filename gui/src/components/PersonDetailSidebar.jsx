@@ -41,12 +41,12 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
   const metrics = isSemanticFlow
     ? extractSemanticFlowMetrics(analysisData, egoGraphData.self.id, person.id)
     : {
-        // Legacy ego_ops metrics
-        readability: analysisData?.metrics?.per_neighbor_readability?.[person.id],
-        overlap: analysisData?.metrics?.overlaps?.[person.id],
-        orientationScore: analysisData?.metrics?.orientation_scores?.[person.id],
-        orientationBreakdown: analysisData?.metrics?.orientation_score_breakdowns?.[person.id],
-      };
+      // Legacy ego_ops metrics
+      readability: analysisData?.metrics?.per_neighbor_readability?.[person.id],
+      overlap: analysisData?.metrics?.overlaps?.[person.id],
+      orientationScore: analysisData?.metrics?.orientation_scores?.[person.id],
+      orientationBreakdown: analysisData?.metrics?.orientation_score_breakdowns?.[person.id],
+    };
 
   // Find which cluster this person belongs to
   let personCluster = null;
@@ -412,7 +412,7 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
           {/* Phrase Contributions - What Makes This Person Stand Out */}
           {!isFocalNode && analysisData?.metrics?.phrase_contributions?.[person.id] && (
             <div style={sectionStyle}>
-              <div style={sectionTitleStyle}>What Makes {fullPersonData.name} Stand Out</div>
+              <div style={sectionTitleStyle}>How {fullPersonData.name} contributes to your interests</div>
               <div style={{ fontSize: '0.875rem', lineHeight: '1.6', marginBottom: '12px', color: isDarkMode ? '#9ca3af' : '#6b7280' }}>
                 These are your interests that create the strongest pull toward {fullPersonData.name}.
               </div>
@@ -664,12 +664,11 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
                   <div style={codeBlockStyle}>
                     {Object.entries(metrics.orientationBreakdown.components).map(([componentName, component]) => {
                       const isNegative = component.weighted_contribution < 0;
-                      const weight = metrics.orientationBreakdown.weights[`lambda${
-                        componentName === 'exploration' ? '1' :
-                        componentName === 'readability' ? '2' :
-                        componentName === 'attunement' ? '3' :
-                        componentName === 'relevance' ? '4' : '5'
-                      }_${componentName}`];
+                      const weight = metrics.orientationBreakdown.weights[`lambda${componentName === 'exploration' ? '1' :
+                          componentName === 'readability' ? '2' :
+                            componentName === 'attunement' ? '3' :
+                              componentName === 'relevance' ? '4' : '5'
+                        }_${componentName}`];
 
                       return (
                         <div key={componentName} style={{
@@ -714,11 +713,11 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
                                   </div>
                                 )}
                                 {component.metadata.translation_vector_magnitude !== undefined &&
-                                 component.metadata.translation_vector_magnitude > 0 && (
-                                  <div style={{ marginTop: '2px' }}>
-                                    Translation distance: {component.metadata.translation_vector_magnitude.toFixed(3)}
-                                  </div>
-                                )}
+                                  component.metadata.translation_vector_magnitude > 0 && (
+                                    <div style={{ marginTop: '2px' }}>
+                                      Translation distance: {component.metadata.translation_vector_magnitude.toFixed(3)}
+                                    </div>
+                                  )}
                               </div>
                             )}
                           </div>
@@ -780,7 +779,7 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
               <div style={phraseListStyle}>
                 {personCluster.map(memberId => {
                   const member = egoGraphData.connections.find(c => c.id === memberId) ||
-                                 (memberId === egoGraphData.self.id ? egoGraphData.self : null);
+                    (memberId === egoGraphData.self.id ? egoGraphData.self : null);
                   return (
                     <div key={memberId} style={{
                       fontWeight: memberId === person.id ? '700' : '400',
