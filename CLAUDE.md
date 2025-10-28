@@ -14,21 +14,12 @@ Drop in a Pond is a semantic network navigation system that uses geometric reaso
 # Install dependencies (uses uv for package management)
 uv sync
 
-# Run analysis on example ego graph
-uv run python src/ego_ops.py fronx
+# Run semantic flow analysis on example ego graph
+uv run python src/semantic_flow.py fronx
 
 # Run analysis on a different ego graph
-uv run python src/ego_ops.py <graph_name>
-# (looks for data/ego_graphs/<graph_name>/ directory)
-```
-
-### Semantic Flow Analysis
-
-Run blended semantic-structural analysis with clustering:
-
-```bash
-# Run semantic flow analysis on an ego graph
 uv run python src/semantic_flow.py <graph_name>
+# (looks for data/ego_graphs/<graph_name>/ directory)
 ```
 
 **Output**: Creates timestamped analysis files in `data/analyses/`:
@@ -131,15 +122,6 @@ The system computes six metrics to help navigate your network:
 - `ego_clusters()`: Cluster neighbors using greedy modularity maximization
 - `jaccard_overlap()`: Compute structural overlap between neighborhoods
 - `tie_weight_entropy()`: Measure attention distribution across clusters
-
-**src/ego_ops.py**: Navigation metrics and analysis
-- Utility functions (cosine similarity, normalization, R² metrics)
-- Public legibility: `public_legibility_r2()` for ridge regression reconstruction
-- Subjective attunement: `subjective_attunement_r2()` (includes gated rank-2 variant)
-- Heat-residual novelty: `heat_residual_norm()` for diffusion on graph Laplacian
-- Translation vectors: `pocket_centroid()` for semantic centroid differences
-- Orientation scores: `orientation_score_breakdowns()` for composite metric
-- Command-line runner
 
 **src/translation_hints.py**: Finds lexical bridges between people's vocabularies using phrase-level semantic alignment
 
@@ -345,20 +327,6 @@ See `docs/V02_MIGRATION.md` for details on the v0.2 architecture.
 **Continuous over discrete**: Design principle to avoid premature hardening of semantic structure. Phrase-level embeddings provide the foundation for future continuous field operations.
 
 **Living memory**: Design principle for temporal dynamics. Timestamps are captured for future exponential decay implementation. The graph is designed to represent a "living present," not an archive.
-
-## Adding New Metrics
-
-1. Define computation function in `src/ego_ops.py`:
-   ```python
-   def compute_new_metric(ego_data: EgoData, clusters: dict) -> dict:
-       """Docstring with clear explanation"""
-       # Computation here
-       return results
-   ```
-
-2. Integrate in main pipeline (see `if __name__ == "__main__"` block at end of file)
-
-3. Optionally incorporate into orientation scores (see `orientation_score_breakdowns()` function)
 
 ## Mathematical Dependencies
 

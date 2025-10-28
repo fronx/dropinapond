@@ -90,10 +90,10 @@ Use actual person IDs everywhere, not abbreviations. Timestamp everything with t
 When you've captured enough to make analysis useful (your judgment), run:
 
 ```bash
-uv run python src/ego_ops.py {graph_name}
+uv run python src/semantic_flow.py {graph_name}
 ```
 
-This computes embeddings, runs all six navigation metrics, generates a visualization, and saves detailed analysis. Share whatever insights feel relevant - high orientation scores, interesting clusters, attention patterns, bridges.
+This computes embeddings, runs semantic flow analysis with all metrics (F, D, F_MB, E_MB), detects clusters, and saves analysis to `data/analyses/{graph_name}_latest.json`. Share whatever insights feel relevant - semantic affinity patterns, exploration potential, coherence scores, connection suggestions.
 
 The analysis is a tool for conversation, not an ending. Sometimes you'll run it, discuss the results, and then keep adding people. Sometimes they'll want to stop after seeing it. Follow what makes sense.
 

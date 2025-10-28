@@ -85,7 +85,7 @@ It's **distributed and privacy-preserving**: each person runs local computations
 If you just want to see it work:
 ```bash
 uv sync
-uv run python src/ego_ops.py fronx
+uv run python src/semantic_flow.py fronx
 ```
 
 This analyzes the example ego graph and outputs all navigation metrics.

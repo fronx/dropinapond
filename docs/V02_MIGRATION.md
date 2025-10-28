@@ -28,8 +28,8 @@ fronx/          ←────────────→  chroma_db/
                                 ↓
                          EmbeddingService
                                 ↓
-                          ego_ops.py
-                         (all 6 metrics)
+                       semantic_flow.py
+                        (all metrics)
 ```
 
 ### Benefits

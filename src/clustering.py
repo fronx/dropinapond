@@ -2,7 +2,7 @@
 """
 Clustering algorithms for ego graph neighbors.
 
-Separates clustering logic from the main ego_ops module.
+Provides clustering algorithms for ego graph analysis.
 Includes both discrete clustering and continuous kernel-based neighborhoods.
 """
 from typing import List, Dict, Optional, Tuple, TYPE_CHECKING

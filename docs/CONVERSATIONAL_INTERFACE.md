@@ -57,9 +57,9 @@ Claude: [After more conversation...]
 
         Let me update your ego graph and see what insights come up.
 
-        [Claude writes to data/ego_graphs/justin.json]
+        [Claude writes to data/ego_graphs/justin/]
         [Claude computes embeddings via ChromaDB]
-        [Claude runs: uv run python src/ego_ops.py justin]
+        [Claude runs: uv run python src/semantic_flow.py justin]
 
         Your network has two main clusters:
         - Audio-tech: Lara, Pat, Kim
@@ -165,19 +165,9 @@ You can:
 
 1. **Have another conversation**: Run `/ego-session` again anytime
 2. **Edit JSON directly**: The format is human-readable
-3. **Manual analysis**: Run `uv run python src/ego_ops.py {your_name}` anytime
+3. **Manual analysis**: Run `uv run python src/semantic_flow.py {your_name}` anytime
 
 Changes are incremental - Claude will load your existing graph and add to it.
-
-## Future Features (v0.3+)
-
-**Temporal decay**: Phrases will automatically fade over time (τ ≈ 40 days) unless re-mentioned. This creates a "living graph" that reflects your current focus, not historical accumulation.
-
-**Edge dynamics**: Track past/present/future interaction dimensions, with separate decay rates.
-
-**Prediction confidence**: Track how certain you are about your model of each person, with confidence decay over time without interaction.
-
-**Trajectory analysis**: Detect semantic velocity (what direction your interests are moving) and predict future positions.
 
 ## Tips for Good Sessions
 
@@ -192,7 +182,7 @@ Changes are incremental - Claude will load your existing graph and add to it.
 Under the hood, Claude:
 - Reads/writes JSON directly (no special API needed)
 - Calls `src.embeddings.get_embedding_service()` to cache vectors in ChromaDB
-- Runs `src/ego_ops.py` via bash to compute navigation metrics
+- Runs `src/semantic_flow.py` via bash to compute navigation metrics
 - Interprets mathematical results into conversational insights
 
 The `/ego-session` slash command is just a markdown file (`.claude/commands/ego-session.md`) with detailed instructions - no custom code required.
@@ -200,6 +190,6 @@ The `/ego-session` slash command is just a markdown file (`.claude/commands/ego-
 ## See Also
 
 - [VISION.md](VISION.md): The big picture and use cases
-- [ARCHITECTURE.md](ARCHITECTURE.md): Mathematical foundations of the six metrics
-- [IMPLEMENTATION.md](IMPLEMENTATION.md): Technical implementation guide
+- [SEMANTIC_FLOW_GUIDE.md](SEMANTIC_FLOW_GUIDE.md): Understanding analysis output
+- [ARCHITECTURE.md](ARCHITECTURE.md): Mathematical foundations
 - [V02_MIGRATION.md](V02_MIGRATION.md): Details on phrase-level embeddings and ChromaDB

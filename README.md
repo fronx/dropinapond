@@ -39,19 +39,18 @@ Claude will guide you through building your network graph conversationally. See 
 uv sync
 
 # Run analysis on example ego graph
-uv run python src/ego_ops.py fronx
+uv run python src/semantic_flow.py fronx
 ```
 
-This analyzes the [example ego graph](data/ego_graphs/fronx.json) and outputs all navigation metrics.
+This analyzes the [example ego graph](data/ego_graphs/fronx/) and outputs semantic flow analysis with all navigation metrics.
 
 ## Documentation
 
 - **[Documentation Index](docs/INDEX.md)** - Start here for full overview
 - **[Conversational Interface](docs/CONVERSATIONAL_INTERFACE.md)** - Build your graph through natural dialogue
+- **[Semantic Flow Guide](docs/SEMANTIC_FLOW_GUIDE.md)** - Understanding analysis output
 - **[Vision & User Experience](docs/VISION.md)** - What is this and what's it like to use?
 - **[Architecture](docs/ARCHITECTURE.md)** - How does it work internally?
-- **[Distributed Protocol](docs/DISTRIBUTED.md)** - Privacy model & federation
-- **[Implementation Guide](docs/IMPLEMENTATION.md)** - Building and extending the system
 
 ## What It Does
 
@@ -62,89 +61,72 @@ The system helps you answer questions like:
 - How should I frame my message to reach different regions?
 - Where is the novelty - who offers perspectives I don't yet understand?
 
-It operates on **continuous semantic fields** using kernel methods, avoiding premature clustering. Structure emerges from analysis, not from stored categories.
+It operates on **phrase-level semantic embeddings** stored in ChromaDB, blending structural relationships with semantic affinity to reveal navigation opportunities.
 
-It combines **spectral graph theory**, **statistical learning**, **kernel methods**, and **differential geometry** to provide actionable navigation advice.
+## Analysis Output
 
-## Core Metrics (Continuous Field Version)
+The system performs semantic-structural flow analysis and generates:
 
-1. **Semantic landscape picture**: Kernel-based density and soft neighborhoods (no hard clustering)
-2. **Public legibility (R²_in)**: Kernel-weighted reconstruction of your semantic field
-3. **Subjective attunement (R²_out)**: How well you reconstruct neighbors' fields (with legibility threshold)
-4. **Heat-residual novelty**: Topological distance using continuous diffusion geometry
-5. **Semantic gradients**: Local field translation (not discrete centroid differences)
-6. **Orientation scores**: Composite metric for choosing next interactions
+- **F** (predictability): Mutual phrase-level affinity between people
+- **D** (distance): Semantic distance based on mean embeddings
+- **F_MB** (Markov-blanket predictability): Context-aware coupling
+- **E_MB** (exploration potential): Combines predictability with distance
+- **Coherence metrics**: Semantic-structural alignment scores
+- **Cluster detection**: Community structure in blended graph
+- **Connection suggestions**: Recommended new connections based on semantic proximity
 
-See [Architecture](docs/ARCHITECTURE.md) for detailed explanations and [Continuous Fields](docs/CONTINUOUS_FIELDS.md) for the architectural shift.
+See [Semantic Flow Guide](docs/SEMANTIC_FLOW_GUIDE.md) for detailed explanations.
 
-## Ego Graph Format (v0.2 - Continuous Fields)
+## Ego Graph Format
 
-Define your network in `data/ego_graphs/<name>.json`:
+Ego graphs use a modular directory structure with embeddings stored separately in ChromaDB:
 
+```
+data/ego_graphs/<name>/
+├── metadata.json           # Version and graph-level info
+├── self.json              # Ego node's semantic field
+├── connections/           # Individual files for each person
+│   ├── person1.json
+│   ├── person2.json
+│   └── ...
+├── edges.json            # All relationship edges
+└── contact_points.json   # Past/present/potential interactions
+```
+
+**self.json** and **connections/*.json** contain:
 ```json
 {
-  "focal_node": "F",
-  "nodes": [
-    {
-      "id": "F",
-      "name": "Your Name",
-      "phrases": [
-        {
-          "text": "topic1",
-          "embedding": [0.82, 0.31, -0.15, 0.41, 0.52],
-          "weight": 1.0
-        },
-        {
-          "text": "topic2",
-          "embedding": [0.78, 0.25, -0.09, 0.38, 0.49],
-          "weight": 0.9
-        }
-      ],
-      "embedding": {
-        "mean": [0.80, 0.28, -0.12, 0.40, 0.50]
-      },
-      "is_self": true
-    },
-    {
-      "id": "neighbor1",
-      "name": "Neighbor Name",
-      "phrases": [
-        {
-          "text": "topic3",
-          "embedding": [0.41, 0.61, 0.08, -0.19, 0.35],
-          "weight": 1.0
-        }
-      ],
-      "embedding": {
-        "mean": [0.41, 0.61, 0.08, -0.19, 0.35]
-      },
-      "is_self": false,
-      "prediction_confidence": 0.6
-    }
+  "id": "person_id",
+  "name": "Person Name",
+  "phrases": [
+    {"text": "topic area", "weight": 0.8, "last_updated": "2025-10-24"}
   ],
-  "edges": [
-    {
-      "source": "F",
-      "target": "neighbor1",
-      "actual": {"present": 0.8},
-      "potential": 0.65
-    }
+  "capabilities": ["skill1", "skill2"],
+  "availability": [
+    {"date": "2025-10-24", "score": 0.8, "content": "Available"}
+  ],
+  "notes": [
+    {"date": "2025-10-24", "content": "Met at conference"}
   ]
 }
 ```
 
-**Key change**: `phrases` array is now the **primary representation**. Each phrase has its own embedding. Person-level `embedding.mean` is optional summary.
+**edges.json** contains:
+```json
+[
+  {
+    "source": "your_id",
+    "target": "person_id",
+    "actual": 0.8
+  }
+]
+```
 
-**Edge types**:
-- `potential`: Semantic alignment (auto-computed from embeddings if not provided)
-- `actual`: Real interaction strength
-  - `past`: Historical interactions (0-1, decays slowly)
-  - `present`: Current interactions (0-1, decays quickly)
-  - `future`: Planned interactions (0-1, medium decay)
-
-The gap between `potential` and `actual` reveals latent opportunities.
-
-**Temporal model**: Phrase weights and edge strengths decay exponentially over time (τ ≈ 40 days). The graph represents a **living present**, not an archive. See [Temporal Dynamics](docs/TEMPORAL_DYNAMICS.md).
+**Key points**:
+- Phrases contain only text and weight, not embeddings
+- Embeddings are computed and cached in ChromaDB (`./chroma_db/`)
+- Mean embeddings computed on-demand from weighted phrase embeddings
+- Use the `/ego-session` command to build your graph conversationally
 
 ## Dependencies
 
@@ -155,23 +137,3 @@ The gap between `potential` and `actual` reveals latent opportunities.
 - scikit-learn ≥1.2
 
 Managed with [uv](https://github.com/astral-sh/uv) for fast, reliable package management.
-
-## Project Status
-
-**Current (v0.1)**: Core metrics working with discrete clustering, example fixture, command-line analysis
-
-**In progress (v0.2)**: Refactoring to continuous semantic fields (see [CONTINUOUS_FIELDS.md](docs/CONTINUOUS_FIELDS.md))
-
-**Next**: Conversational interface (Claude-based), embedding pipeline, temporal dynamics, feedback loops
-
-See [Implementation Guide](docs/IMPLEMENTATION.md) for roadmap and contributing info.
-
-## Why Continuous Fields?
-
-Previous approach used discrete clustering, which created artificial boundaries and feedback loops. New approach:
-- Keeps phrase-level embeddings (richer representation)
-- Uses kernel methods for soft neighborhoods
-- Computes clusters on-demand for visualization only
-- Preserves semantic continuity
-
-See [Continuous Semantic Fields](docs/CONTINUOUS_FIELDS.md) for full explanation.
