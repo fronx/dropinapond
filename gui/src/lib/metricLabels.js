@@ -58,11 +58,18 @@ export function getSemanticFlowLabel(metricName, value) {
       { max: 1.0, label: 'primary', description: 'Very high interaction level', interpretation: 'This is one of your primary relationships.' },
     ],
     distanceRaw: [
-      { max: 0.2, label: 'very close', description: 'Centers of gravity nearly aligned', interpretation: 'Your semantic centers are very close - you occupy similar conceptual space.' },
-      { max: 0.4, label: 'nearby', description: 'Close but distinct centers', interpretation: 'Close enough to share territory but with distinct focuses.' },
-      { max: 0.6, label: 'moderate gap', description: 'Significant separation', interpretation: 'There\'s a moderate gap between your conceptual centers.' },
-      { max: 0.8, label: 'far apart', description: 'Large semantic distance', interpretation: 'Your conceptual centers are quite far apart.' },
-      { max: 1.0, label: 'very distant', description: 'Very different semantic fields', interpretation: 'You occupy very different parts of semantic space.' },
+      { max: 0.2, label: 'very close', description: 'Centers of gravity nearly aligned', interpretation: 'Your semantic centers of gravity are very close - you occupy similar conceptual space.' },
+      { max: 0.4, label: 'nearby', description: 'Close but distinct centers', interpretation: 'Your semantic centers are nearby - close enough to share territory but with distinct focuses.' },
+      { max: 0.6, label: 'moderate distance', description: 'Significant separation', interpretation: 'There\'s moderate distance between your conceptual centers - meaningfully different focuses.' },
+      { max: 0.8, label: 'far apart', description: 'Large semantic distance', interpretation: 'Your semantic centers are far apart - quite different conceptual focuses.' },
+      { max: 1.0, label: 'very distant', description: 'Very different semantic fields', interpretation: 'Your semantic centers are very distant - you occupy very different parts of conceptual space.' },
+    ],
+    predictabilityRaw: [
+      { max: 0.2, label: 'different worlds', description: 'Very little phrase overlap', interpretation: 'What you\'re each about overlaps very little - you occupy quite different life areas.' },
+      { max: 0.4, label: 'some overlap', description: 'Some shared territory', interpretation: 'You share some territory in what you\'re about, though there are likely areas they care about that aren\'t in your model.' },
+      { max: 0.6, label: 'moderate overlap', description: 'Decent phrase cloud overlap', interpretation: 'Decent overlap in your phrase clouds - you can see what connects you at a surface level.' },
+      { max: 0.8, label: 'strong overlap', description: 'Substantial common ground', interpretation: 'Strong similarity in what you\'re each about - your phrase clouds have substantial common ground.' },
+      { max: 1.0, label: 'very similar worlds', description: 'Very high phrase overlap', interpretation: 'What occupies your respective worlds is very similar, at least at the phrase level you\'ve captured.' },
     ],
     fitRatio: [
       { max: 0.5, label: 'strong bridge', description: 'Couples more outside than inside', interpretation: 'This person is a bridge or ambassador - they connect to other clusters more than their own.' },
@@ -142,8 +149,6 @@ export function computeMetricPercentiles(metricName, analysisData, egoId) {
     Object.values(analysisData.metrics.layers.semantic_affinity[egoId]).forEach(v => values.push(v));
   } else if (metricName === 'effectiveEdge' && analysisData.metrics.layers?.effective_edges?.[egoId]) {
     Object.values(analysisData.metrics.layers.effective_edges[egoId]).forEach(v => values.push(v));
-  } else if (metricName === 'predictabilityRaw' && analysisData.metrics.fields?.edge_fields?.[egoId]) {
-    Object.values(analysisData.metrics.fields.edge_fields[egoId]).forEach(obj => values.push(obj.predictability_raw));
   } else if (metricName === 'distanceRaw' && analysisData.metrics.fields?.edge_fields?.[egoId]) {
     Object.values(analysisData.metrics.fields.edge_fields[egoId]).forEach(obj => values.push(obj.distance_raw));
   } else if (metricName === 'predictabilityBlanket' && analysisData.metrics.fields?.edge_fields_blanket?.[egoId]) {
@@ -176,7 +181,6 @@ export function computeAllPercentiles(analysisData, egoId) {
   return {
     semanticAffinity: computeMetricPercentiles('semanticAffinity', analysisData, egoId),
     effectiveEdge: computeMetricPercentiles('effectiveEdge', analysisData, egoId),
-    predictabilityRaw: computeMetricPercentiles('predictabilityRaw', analysisData, egoId),
     distanceRaw: computeMetricPercentiles('distanceRaw', analysisData, egoId),
     predictabilityBlanket: computeMetricPercentiles('predictabilityBlanket', analysisData, egoId),
     explorationPotential: computeMetricPercentiles('explorationPotential', analysisData, egoId),
@@ -234,13 +238,6 @@ export function getPercentileLabel(metricName, value, percentiles) {
       { label: 'good alignment', interpretation: 'Your interests align well - typical for your network.' },
       { label: 'strong resonance', interpretation: 'Stronger conceptual overlap than most of your connections.' },
       { label: 'exceptional alignment', interpretation: 'Among your closest semantic matches - you think about very similar things.' },
-    ],
-    predictabilityRaw: [
-      { label: 'lower mutual pull', interpretation: 'The semantic pull between you is weaker than most of your connections.' },
-      { label: 'moderate reciprocity', interpretation: 'There\'s mutual semantic pull, though not as strong as your top connections.' },
-      { label: 'balanced pull', interpretation: 'Good reciprocity - you both pull toward each other conceptually.' },
-      { label: 'strong reciprocity', interpretation: 'Strong mutual pull - collaboration feels natural and balanced.' },
-      { label: 'exceptional reciprocity', interpretation: 'Among your strongest mutual connections - you can easily anticipate each other.' },
     ],
     effectiveEdge: [
       { label: 'weaker link', interpretation: 'Structure and meaning combine to make this a less prominent connection.' },

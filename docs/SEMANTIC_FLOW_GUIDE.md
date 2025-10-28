@@ -37,9 +37,9 @@ Output written to `data/analyses/<name>_latest.json` with timestamped backup.
 
 **Edge Fields**
 - `metrics.fields.edge_fields[src][tgt].predictability_raw`
-  - What it is: Symmetric mutual predictability `F = sqrt(A[src,tgt] * A[tgt,src])`, normalized to [0,1].
-  - Read as: Reciprocity of semantic pull; how jointly expectable the pair is as co‑participants.
-  - Use it to: Spot pairs with balanced, high mutual alignment (collaboration feels “natural”).
+  - What it is: Symmetric mutual predictability `F = sqrt(A[src,tgt] * A[tgt,src])`, so the geometric mean of phrase-pair affinities, normalized to [0,1] (cosine-like).
+  - Read as: Direct overlap of language. How similar the literal word clouds are between two people.
+  - Use it to: Confirm that you know what connects you semantically. But consider that there may be other things they are about that are not captured by your model of their semantic world.
 
 - `metrics.fields.edge_fields[src][tgt].distance_raw`
   - What it is: Semantic distance `D = 1 − cosine(mean_src, mean_tgt)`, normalized to [0,1]. Lower is closer.

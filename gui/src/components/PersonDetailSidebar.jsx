@@ -339,26 +339,20 @@ export function PersonDetailSidebar({ person, egoGraphData, analysisData, onClos
               <div style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>
                 {metrics.predictabilityRaw !== undefined && (
                   <div style={{ marginBottom: metrics.distanceRaw !== undefined ? '8px' : '0' }}>
-                    {(() => {
-                      const predLabel = getPercentileLabel('predictabilityRaw', metrics.predictabilityRaw, percentiles?.predictabilityRaw);
-                      if (predLabel) {
-                        return (
-                          <>
-                            <strong style={{ textTransform: 'capitalize' }}>
-                              {predLabel.label}
-                            </strong>
-                            {' — '}
-                            {predLabel.interpretation.toLowerCase()}
-                          </>
-                        );
-                      }
-                      return null;
-                    })()}
+                    <strong style={{ textTransform: 'capitalize' }}>
+                      {getSemanticFlowLabel('predictabilityRaw', metrics.predictabilityRaw).label}
+                    </strong>
+                    {' — '}
+                    {getSemanticFlowLabel('predictabilityRaw', metrics.predictabilityRaw).interpretation}
                   </div>
                 )}
                 {metrics.distanceRaw !== undefined && (
                   <div>
-                    Your semantic centers are <strong>{getSemanticFlowLabel('distanceRaw', metrics.distanceRaw).label}</strong>.
+                    <strong style={{ textTransform: 'capitalize' }}>
+                      {getSemanticFlowLabel('distanceRaw', metrics.distanceRaw).label}
+                    </strong>
+                    {' — '}
+                    {getSemanticFlowLabel('distanceRaw', metrics.distanceRaw).interpretation}
                   </div>
                 )}
               </div>
