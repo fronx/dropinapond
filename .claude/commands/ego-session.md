@@ -52,7 +52,6 @@ Then you're structuring that into JSON files as you go.
 
 **edges.json** (relationships):
 - Connection strength on 0-1 scale: 0.9-1.0 (very close), 0.7-0.8 (regular), 0.5-0.6 (occasional), 0.3-0.4 (distant), 0.1-0.2 (barely connected)
-- Channels: how they interact (video_calls, in_person, telegram, etc.)
 
 **contact_points.json** (relational history):
 - Past: how people met, historical events, old projects
@@ -72,7 +71,7 @@ When they mention someone: read their file (if exists), update it with new info,
 
 **Adding a person:**
 - Create `connections/{person_id}.json` with id, name, capabilities, availability, notes, phrases
-- Add edge to `edges.json` with source (focal node id), target (person id), actual (strength 0-1), channels
+- Add edge to `edges.json` with source (focal node id), target (person id), actual (strength 0-1)
 
 **Updating anything:**
 - Read the file, modify it, write it back
