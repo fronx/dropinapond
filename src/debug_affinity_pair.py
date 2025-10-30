@@ -12,7 +12,7 @@ from pathlib import Path
 
 # import functions from your analysis code
 from embeddings import get_embedding_service
-from semantic_flow import _phrase_matrix, _semantic_affinity, _weighted_mean_embedding
+from flow_analysis import _phrase_matrix, _semantic_affinity, _weighted_mean_embedding
 
 def main(graph_name: str, node_a: str, node_b: str, cos_min: float = 0.2):
     emb = get_embedding_service()

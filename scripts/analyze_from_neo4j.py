@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run semantic flow analysis using Neo4j as the data source (single-graph model).
 
-NOTE: Currently loads from file-based storage. Phase 2 will integrate Neo4j loading.
+Loads ego graph from Neo4j Aura, runs analysis, and saves results to JSON files.
 
 Usage:
     python scripts/analyze_from_neo4j.py
@@ -23,7 +23,8 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.neo4j_storage import load_ego_graph_from_neo4j
-from src.semantic_flow import analyze, Params
+from src.semantic_flow import analyze, AnalysisParams, save_analysis_to_json
+from src.embeddings import get_embedding_service
 
 
 def main():
@@ -51,20 +52,28 @@ def main():
 
     args = parser.parse_args()
 
-    print(f"Running semantic flow analysis from file-based storage...")
-    print("NOTE: Phase 2 will load from Neo4j instead")
+    print("Running semantic flow analysis from Neo4j...")
 
     try:
-        # Note: The analyze() function internally loads from file-based storage
-        # Phase 2 will refactor analyze() to accept ego_data from Neo4j
+        # Load ego graph from Neo4j (single graph, no name needed)
+        print("Loading ego graph from Neo4j...")
+        ego_data = load_ego_graph_from_neo4j()
+        print(f"Loaded {len(ego_data.nodes)} nodes, {len(list(ego_data.edges))} edges")
 
-        params = Params(
+        # Create embedding service for phrase operations
+        embedding_service = get_embedding_service()
+
+        # Run analysis (now accepts ego_data)
+        print("Running analysis...")
+        params = AnalysisParams(
             alpha=args.alpha,
-            cos_min=args.cos_min,
-            export_dir=args.output_dir
+            cos_min=args.cos_min
         )
+        analysis_result = analyze(ego_data, params, embedding_service)
 
-        output_path = analyze(params)
+        # Save to JSON (analysis stays in JSON files)
+        print("Saving results...")
+        output_path = save_analysis_to_json(analysis_result, args.output_dir)
         print(f"\nAnalysis complete! Results saved to {output_path}")
 
     except Exception as e:

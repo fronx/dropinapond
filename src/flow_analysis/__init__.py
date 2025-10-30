@@ -4,6 +4,9 @@ Semantic-Structural Flow Analysis - Modular Components
 
 Blend factual topology (edges.json) with semantic affinity derived from phrase
 embeddings in ChromaDB, then compute various fields and metrics.
+
+This package provides the modular components. For the main orchestrator with
+analyze(), AnalysisParams, etc., import from the parent-level semantic_flow module.
 """
 
 from .structural import build_structural_matrix

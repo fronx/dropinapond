@@ -19,9 +19,9 @@ from pathlib import Path
 from typing import Optional, List, Dict
 import numpy as np
 
-from storage import load_ego_graph, EgoData
-from embeddings import get_embedding_service
-from semantic_flow import (
+from src.storage import load_ego_graph, EgoData
+from src.embeddings import get_embedding_service
+from src.flow_analysis import (
     build_structural_matrix,
     load_phrase_data,
     compute_semantic_affinity_matrix,
@@ -35,7 +35,7 @@ from semantic_flow import (
     build_analysis_output,
     write_analysis,
 )
-from semantic_flow.coherence import compute_coherence as compute_semantic_coherence
+from src.flow_analysis.coherence import compute_coherence as compute_semantic_coherence
 
 
 @dataclass

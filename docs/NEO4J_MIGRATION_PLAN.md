@@ -260,30 +260,37 @@ This change completes the UI/UX simplification for the single-graph model. Users
 
 This step was already completed as part of the single-graph model simplification.
 
-#### Step 3: Update Scripts to Use New Architecture
+#### Step 3: Update Scripts to Use New Architecture ✓
+
+**Status:** Completed 2025-10-30
 
 **Goal:** Enable Neo4j-based analysis using the refactored `analyze()` function.
 
-**Tasks:**
+**Changes implemented:**
 
-1. **Update [scripts/analyze_from_neo4j.py](../scripts/analyze_from_neo4j.py)**:
-   ```python
-   # Load ego graph from Neo4j (single graph, no name needed)
-   ego_data = load_ego_graph_from_neo4j()
+1. **Fixed package naming conflict**:
+   - Renamed `src/semantic_flow/` package to `src/flow_analysis/` to avoid conflict with `src/semantic_flow.py` module
+   - Updated all imports in `src/semantic_flow.py` and `src/debug_affinity_pair.py`
+   - Changed imports to absolute paths (e.g., `from src.storage import` instead of `from storage import`)
 
-   # Run analysis (now accepts ego_data)
-   analysis_result = analyze(ego_data, params, embedding_service)
+2. **Updated [scripts/analyze_from_neo4j.py](../scripts/analyze_from_neo4j.py)**:
+   - Now loads ego graph from Neo4j: `ego_data = load_ego_graph_from_neo4j()`
+   - Runs analysis with Neo4j data: `analysis_result = analyze(ego_data, params, embedding_service)`
+   - Saves to JSON: `save_analysis_to_json(analysis_result, output_dir)`
+   - Removed outdated comments about Phase 2 integration (now complete)
 
-   # Save to JSON (analysis stays in JSON files)
-   save_analysis_to_json(analysis_result, output_dir)
-   ```
-
-2. **Test Neo4j-based analysis**:
-   - Load graph from Neo4j
-   - Run analysis
-   - Verify JSON output identical to file-based analysis
+3. **Testing results**:
+   - ✅ Neo4j-based analysis runs successfully
+   - ✅ Loads 31 nodes, 61 edges from Neo4j
+   - ✅ JSON output identical to file-based analysis
+   - ✅ Same clusters, suggestions, coherence metrics
+   - ✅ Both pipelines use same `analyze()` function
 
 **Key benefit:** Both file-based and Neo4j-based pipelines now use the same `analyze()` function. The only difference is the source of `EgoData` (files vs Neo4j).
+
+**Actual time:** ~1 hour
+
+**Next:** Step 4 (Create FastAPI Backend)
 
 #### Step 4: Create FastAPI Backend
 
