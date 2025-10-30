@@ -84,31 +84,45 @@ This loads a conversational guide that helps you:
 
 See [.claude/commands/ego-session.md](.claude/commands/ego-session.md) for full details.
 
+### FastAPI Backend Server
+
+The backend provides a unified API that auto-detects your data source (Neo4j or files):
+
+```bash
+# Start the backend server
+uv run uvicorn server.main:app --reload --port 3001
+```
+
+**Endpoints**:
+- `GET /health`: Health check
+- `GET /api/graph`: Returns ego graph structure (nodes, edges, focal, names)
+- `GET /api/analysis`: Returns latest analysis results
+
+**Single decision point - environment variables in `.env`**:
+- With Neo4j credentials (`NEO4J_ID`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`): Loads from Neo4j
+- Without Neo4j credentials: Loads from file-based storage in `data/ego_graph/`
+
+Server logs indicate which data source is active: `[INFO] Loading from Neo4j (env vars detected)` or `[INFO] Loading from files (no Neo4j env vars)`.
+
 ### GUI Development
 
 The project includes a React-based visualization interface:
 
 ```bash
-# Navigate to GUI directory
+# Start development server (requires backend running)
 cd gui
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 # Opens at http://localhost:5173/
-
-# View specific ego graph
-# Navigate to http://localhost:5173/<graph_name>
-# e.g., http://localhost:5173/fronx
 ```
 
 **GUI Architecture**:
 - Built with React, Vite, xyflow/react for graph visualization
 - Uses D3.js force-directed layout for natural node positioning
-- Loads ego graphs from `/data/ego_graphs/` via symlink
-- Displays analysis results from `/data/analyses/`
+- Single-graph model: loads THE ego graph (no name input)
+- **Always queries FastAPI backend** - no direct file access
+- Backend handles data source selection transparently
+- Displays analysis results from backend API
 - Main components: `EgoGraphView` (orchestrator), `PersonNode` (node display), `PersonDetailSidebar` (details panel)
 
 ### Neo4j Backend (Alternative Storage)

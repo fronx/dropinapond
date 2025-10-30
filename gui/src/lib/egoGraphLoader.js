@@ -1,5 +1,6 @@
 import distinctColors from 'distinct-colors';
 import chroma from 'chroma-js';
+import { fetchGraphFromAPI, fetchAnalysisFromAPI } from './apiClient';
 
 // Generate visually distinct colors for clusters
 function generateClusterColors(count) {
@@ -20,106 +21,19 @@ function generateClusterColors(count) {
 const FOCAL_NODE_COLOR = '#777777';
 
 /**
- * Loads ego graph JSON data from the modular directory structure (single-graph model)
+ * Loads ego graph JSON data from backend API
+ * Backend auto-detects data source (Neo4j or files) based on environment variables
  */
 export async function loadEgoGraph() {
-  try {
-    // Load all files from the modular format
-    // Single-graph model: data lives in /data/ego_graph/ (no subdirectory)
-    const basePath = `/data/ego_graph`;
-
-    const [metadataRes, selfRes, edgesRes, contactPointsRes] = await Promise.all([
-      fetch(`${basePath}/metadata.json`),
-      fetch(`${basePath}/self.json`),
-      fetch(`${basePath}/edges.json`),
-      fetch(`${basePath}/contact_points.json`)
-    ]);
-
-    if (!metadataRes.ok) {
-      throw new Error(`Failed to load metadata.json: ${metadataRes.status} ${metadataRes.statusText}`);
-    }
-    if (!selfRes.ok) {
-      throw new Error(`Failed to load self.json: ${selfRes.status} ${selfRes.statusText}`);
-    }
-    if (!edgesRes.ok) {
-      throw new Error(`Failed to load edges.json: ${edgesRes.status} ${edgesRes.statusText}`);
-    }
-
-    const [metadata, self, edges, contactPoints] = await Promise.all([
-      metadataRes.json(),
-      selfRes.json(),
-      edgesRes.json(),
-      contactPointsRes.ok ? contactPointsRes.json() : { past: [], present: [], potential: [] }
-    ]);
-
-    // Extract connection IDs from edges (since we don't have a manifest file)
-    const uniqueIds = new Set();
-    edges.forEach(edge => {
-      if (edge.source !== self.id) uniqueIds.add(edge.source);
-      if (edge.target !== self.id) uniqueIds.add(edge.target);
-    });
-    const connectionIds = Array.from(uniqueIds);
-
-    // Load all connection files
-    const connections = await Promise.all(
-      connectionIds.map(async (id) => {
-        const res = await fetch(`${basePath}/connections/${id}.json`);
-        if (res.ok) {
-          return await res.json();
-        }
-        console.warn(`Could not load connection ${id}`);
-        return null;
-      })
-    );
-
-    // Filter out failed loads
-    const validConnections = connections.filter(c => c !== null);
-
-    // Reconstruct the ego graph format expected by the UI
-    return {
-      version: metadata.version,
-      format: metadata.format,
-      metadata,
-      self,
-      connections: validConnections,
-      edges,
-      contact_points: contactPoints
-    };
-  } catch (error) {
-    console.error('Error loading ego graph:', error);
-    throw error;
-  }
+  return await fetchGraphFromAPI();
 }
 
 /**
- * Loads the latest analysis JSON (single-graph model)
+ * Loads the latest analysis JSON from backend API
  * Returns null if no analysis exists
  */
 export async function loadLatestAnalysis() {
-  try {
-    // Single-graph model: analysis is always at analysis_latest.json
-    const url = `/data/analyses/analysis_latest.json`;
-    console.log('Fetching analysis from:', url);
-    const response = await fetch(url);
-    console.log('Analysis fetch response:', response.status, response.ok);
-    if (!response.ok) {
-      console.warn('No analysis found, proceeding without analysis data');
-      return null;
-    }
-
-    // Get the text first to handle Infinity values
-    const text = await response.text();
-    // Replace Infinity with a very large number that JSON can handle
-    // We'll use a special marker value that we can detect later
-    const sanitizedText = text.replace(/:\s*Infinity\b/g, ': 9999999999');
-    const data = JSON.parse(sanitizedText);
-
-    console.log('Analysis data loaded:', data);
-    return data;
-  } catch (error) {
-    console.error('Could not load analysis:', error);
-    return null;
-  }
+  return await fetchAnalysisFromAPI();
 }
 
 /**

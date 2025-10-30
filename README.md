@@ -6,17 +6,30 @@ A **semantic network navigation system** for understanding and strategically nav
 
 ## Quick Start
 
-### Option 1: Visual Interface
+### Option 1: Visual Interface (with API Backend)
 
-Explore ego graphs with an interactive force-directed visualization:
+The GUI connects to a FastAPI backend that auto-detects your data source:
 
 ```bash
+# Terminal 1: Start the backend server
+uv sync
+uv run uvicorn server.main:app --reload --port 3001
+
+# Terminal 2: Start the GUI
 cd gui
 npm install
 npm run dev
 ```
 
-Then open `http://localhost:5173/fronx` to view the example graph. See [gui/README.md](gui/README.md) for details.
+Then open `http://localhost:5173/` to view your ego graph.
+
+**Single decision point - backend environment variables:**
+- With Neo4j credentials (`.env`: `NEO4J_ID`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`): Backend loads from Neo4j
+- Without Neo4j credentials: Backend loads from file-based storage in `data/ego_graph/`
+
+The GUI always connects to the backend API and doesn't need to know which data source is active.
+
+See [gui/README.md](gui/README.md) for GUI details.
 
 ### Option 2: Conversational Interface
 
@@ -38,11 +51,18 @@ Claude will guide you through building your network graph conversationally. See 
 # Install dependencies
 uv sync
 
-# Run analysis on example ego graph
-uv run python src/semantic_flow.py fronx
+# Run analysis from files
+uv run python src/semantic_flow.py
+
+# Or run analysis from Neo4j (if credentials are set)
+uv run python scripts/analyze_from_neo4j.py
 ```
 
-This analyzes the [example ego graph](data/ego_graphs/fronx/) and outputs semantic flow analysis with all navigation metrics.
+Both commands analyze your ego graph and output semantic flow analysis to `data/analyses/`. The data source is determined by:
+- `analyze_from_neo4j.py`: Always loads from Neo4j (requires Neo4j credentials in `.env`)
+- `semantic_flow.py`: Always loads from files in `data/ego_graph/`
+
+Both produce identical analysis output files.
 
 ## Documentation
 
@@ -82,7 +102,7 @@ See [Semantic Flow Guide](docs/SEMANTIC_FLOW_GUIDE.md) for detailed explanations
 Ego graphs use a modular directory structure with embeddings stored separately in ChromaDB:
 
 ```
-data/ego_graphs/<name>/
+data/ego_graph/
 ├── metadata.json           # Version and graph-level info
 ├── self.json              # Ego node's semantic field
 ├── connections/           # Individual files for each person

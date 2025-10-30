@@ -292,7 +292,9 @@ This step was already completed as part of the single-graph model simplification
 
 **Next:** Step 4 (Create FastAPI Backend)
 
-#### Step 4: Create FastAPI Backend
+#### Step 4: Create FastAPI Backend ✓
+
+**Status:** Completed 2025-10-30
 
 **Goal:** Create unified API that auto-detects data source and provides single interface to GUI.
 
@@ -307,109 +309,47 @@ This step was already completed as part of the single-graph model simplification
 - Easy to switch: just set/unset environment variables
 - Clean separation: GUI doesn't contain data source logic
 
-**Create new `server/` directory with FastAPI application:**
+**Implementation:**
 
-**server/main.py:**
-```python
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import sys
-import json
-import os
-from pathlib import Path
+1. **Created [server/main.py](../server/main.py)**:
+   - FastAPI application with CORS middleware for development
+   - `load_graph()`: Auto-detects data source from environment variables
+   - `GET /api/graph`: Returns ego graph structure (nodes, edges, focal, names)
+   - `GET /api/analysis`: Returns analysis results from JSON file
+   - `GET /health`: Health check endpoint
 
-# Add parent directory to path to import src modules
-sys.path.insert(0, str(Path(__file__).parent.parent))
+2. **Created [server/requirements.txt](../server/requirements.txt)**:
+   - `fastapi>=0.104.0`
+   - `uvicorn[standard]>=0.24.0`
+   - `python-dotenv>=1.0.0`
 
-from src.storage import load_ego_graph, EgoData
-from src.neo4j_storage import load_ego_graph_from_neo4j
-from src.embeddings import get_embedding_service
-from dotenv import load_dotenv
+3. **Updated [pyproject.toml](../pyproject.toml)**:
+   - Added FastAPI and uvicorn to project dependencies
 
-load_dotenv()
-
-app = FastAPI()
-
-# CORS configuration for development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite dev server
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-def load_graph() -> EgoData:
-    """Load ego graph from configured data source (Neo4j or files)."""
-    # Auto-detect data source based on environment variables
-    if os.getenv('NEO4J_ID') and os.getenv('NEO4J_USERNAME') and os.getenv('NEO4J_PASSWORD'):
-        print("[INFO] Loading from Neo4j (env vars detected)")
-        return load_ego_graph_from_neo4j()
-    else:
-        print("[INFO] Loading from files (no Neo4j env vars)")
-        ego_dir = Path(__file__).parent.parent / "data" / "ego_graph"
-        embedding_service = get_embedding_service()
-        return load_ego_graph(ego_dir, embedding_service)
-
-@app.get("/api/graph")
-async def get_graph():
-    """Return ego graph structure (from Neo4j or files, auto-detected)."""
-    ego_data = load_graph()
-
-    # Convert to JSON-serializable format
-    # TODO: Include person details (phrases, capabilities, notes) from connections
-    return {
-        "nodes": ego_data.nodes,
-        "focal": ego_data.focal,
-        "edges": [{"source": e[0], "target": e[1], "weight": e[2] if len(e) > 2 else 1.0}
-                  for e in ego_data.edges],
-        "names": ego_data.names,
-        # embeddings excluded (too large, GUI doesn't need raw embeddings)
-    }
-
-@app.get("/api/analysis")
-async def get_analysis():
-    """Return analysis results from JSON file (metrics, clusters, suggestions)."""
-    # Analysis stays in JSON files - simpler and more natural for matrix data
-    analyses_dir = Path(__file__).parent.parent / "data" / "analyses"
-    latest_file = analyses_dir / "analysis_latest.json"
-
-    if not latest_file.exists():
-        return {"error": "No analysis found. Run analysis first."}
-
-    with open(latest_file) as f:
-        return json.load(f)
-
-@app.get("/health")
-async def health():
-    """Health check endpoint."""
-    return {"status": "ok"}
-```
-
-**server/requirements.txt:**
-```
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-python-dotenv>=1.0.0
-```
+**Testing results:**
+- ✅ Server starts successfully on port 3001
+- ✅ Health endpoint returns `{"status": "ok"}`
+- ✅ Graph endpoint auto-detects Neo4j and loads 31 nodes, 61 edges
+- ✅ Analysis endpoint returns analysis file with proper structure
+- ✅ CORS configured for Vite dev server (localhost:5173)
 
 **Running the backend:**
 ```bash
-# Install dependencies
-pip install -r server/requirements.txt
+# Sync dependencies (already done)
+uv sync
 
 # Run development server
-uvicorn server.main:app --reload --port 3001
-
-# Or use uv:
-uv pip install -r server/requirements.txt
 uv run uvicorn server.main:app --reload --port 3001
 ```
 
-**Deployment:**
-- Create `server/.env` with Neo4j credentials
-- Use existing root `.env` or symlink for development
-- For production, set environment variables on hosting platform
+**Data source detection:**
+The backend automatically detects the data source:
+- With Neo4j env vars: `[INFO] Loading from Neo4j (env vars detected)`
+- Without Neo4j env vars: `[INFO] Loading from files (no Neo4j env vars)`
+
+**Actual time:** ~45 minutes
+
+**Next:** Step 5 (Update GUI to Query FastAPI Backend)
 
 #### Step 5: Update GUI to Query FastAPI Backend
 
