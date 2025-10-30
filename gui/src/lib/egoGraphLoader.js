@@ -22,7 +22,7 @@ const FOCAL_NODE_COLOR = '#777777';
 /**
  * Loads ego graph JSON data from the modular directory structure (single-graph model)
  */
-export async function loadEgoGraph(name) {
+export async function loadEgoGraph() {
   try {
     // Load all files from the modular format
     // Single-graph model: data lives in /data/ego_graph/ (no subdirectory)
@@ -95,7 +95,7 @@ export async function loadEgoGraph(name) {
  * Loads the latest analysis JSON (single-graph model)
  * Returns null if no analysis exists
  */
-export async function loadLatestAnalysis(name) {
+export async function loadLatestAnalysis() {
   try {
     // Single-graph model: analysis is always at analysis_latest.json
     const url = `/data/analyses/analysis_latest.json`;

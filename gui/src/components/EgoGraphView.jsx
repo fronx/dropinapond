@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams } from 'react-router-dom';
 import {
   ReactFlow,
   Background,
@@ -18,7 +17,6 @@ const nodeTypes = {
 };
 
 export function EgoGraphView() {
-  const { graphName } = useParams();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
@@ -35,13 +33,13 @@ export function EgoGraphView() {
         setLoading(true);
         setError(null);
 
-        // Load ego graph data
-        const egoData = await loadEgoGraph(graphName || 'fronx');
+        // Load ego graph data (single-graph model)
+        const egoData = await loadEgoGraph();
         setMetadata(egoData.metadata);
         setEgoGraphData(egoData);
 
         // Load analysis data (if available)
-        const analysisData = await loadLatestAnalysis(graphName || 'fronx');
+        const analysisData = await loadLatestAnalysis();
         if (analysisData) {
           console.log('Loaded analysis data:', analysisData);
         }
@@ -98,7 +96,7 @@ export function EgoGraphView() {
         simulationRef.current.stop();
       }
     };
-  }, [graphName, setNodes, setEdges]);
+  }, [setNodes, setEdges]);
 
   // Handle node click to open sidebar
   const handleNodeClick = useCallback((event, node) => {
