@@ -10,4 +10,6 @@ dependencies = [
     "matplotlib>=3.9.4",
     "chromadb>=1.2.1",
     "sentence-transformers>=5.1.2",
+    "neo4j~=5.28.0",
+    "python-dotenv>=1.0.0",
 ]

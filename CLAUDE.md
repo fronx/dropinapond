@@ -6,6 +6,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Drop in a Pond is a semantic network navigation system that uses geometric reasoning over embedding spaces to help users understand and strategically navigate their social/professional networks. It's distributed and privacy-preserving - each person maintains their own "epistemic ego graph" with predictions of neighbors' semantic fields.
 
+## Working Agreements
+
+### What Claude Should Do
+
+- **Understand context before implementing**: Ask what problem we're solving and what success looks like. (e.g., "Are we optimizing for read or write performance?" or "Is the cramped feeling when zoomed in or out?")
+- **Clarify subjective terms**: Words like "designy," "polished," "better," "efficient" mean different things. Ask what specifically matters. (e.g., "By efficient - faster execution, less memory, or cleaner code?")
+- **Surface genuine ambiguity**: When there's a real choice with different trade-offs, present options briefly. Don't offer options when there isn't actual ambiguity - that's just noise. (e.g., "Memory cache is faster but ephemeral; SQLite is persistent but slower. Which matters more here?")
+- **Flag uncertainty early**: If something might not work or seems wrong, say so before implementing. (e.g., "Not sure ReactFlow will respect mid-render position changes - test first?" or "100k row migration might need batching?")
+- **Check when to commit**: Ask whether to commit now or keep iterating. Don't assume.
+- **A clarifying question beats a wrong guess**: 30 seconds of discussion saves multiple iteration cycles.
+
+### What Claude Can Expect from Me
+
+- **Clear feedback**: I'll tell you directly when something is too big, too small, or not quite right.
+- **Context when I have it**: If I know the viewing context (e.g., "we'll be zoomed out") or constraints, I'll share them.
+- **Patience with questions**: Asking clarifying questions is always welcome and won't be seen as incompetence.
+- **Honesty about preferences**: If I have a preference about commit style, design direction, or code organization, I'll tell you.
+- **Engagement**: I'm actively reviewing the work and will catch things you miss. We're collaborating, not delegating.
+
+## Development Principles
+
+- **Less code is better.** Reduce, reuse. First refactor, then extend.
+- **Make it work first**, then make it clean
+- **Separate concerns**: functional code from effects, loops from loop bodies
+- **Don't guess.** Use web search to look up APIs, how to use libraries etc. When implementing third-party library APIs, ALWAYS verify the correct method signatures by checking official documentation, reading type definitions, or creating test scripts to explore the API before writing code.
+- **Step back and identify the core problem being asked about, rather than immediately jumping to modify existing code patterns**
+- **Before proposing solutions, use the Task tool to analyze data flow. Ask it to trace how data moves through the system and report back with: 1) Data structures and their fields, 2) Function call chain with parameters, 3) Where data is missing or needs to be passed**
+- **Consult documentation first**: Review `docs/architecture/` before starting. Use it to understand system context, but verify against actual code and update documentation when you find discrepancies.
+- **Document architectural decisions**: When making system design choices, create ADRs in `docs/architecture/adr/` following the established template.
+- **TypeScript prop interfaces**: When adding new properties to component interfaces, make them **required by default**. Only mark properties as optional if there's a specific runtime reason (e.g., intermediate migration states, genuinely optional features). If a property is always provided by callers, it should be required in the type signature.
+
+
 ## Common Commands
 
 ### Development
@@ -80,6 +112,26 @@ npm run dev
 - Displays analysis results from `/data/analyses/`
 - Main components: `EgoGraphView` (orchestrator), `PersonNode` (node display), `PersonDetailSidebar` (details panel)
 
+### Neo4j Backend (Alternative Storage)
+
+Neo4j Aura provides graph-native storage with better scalability and vector search capabilities:
+
+```bash
+# Import ego graph to Neo4j with OpenAI embeddings (recommended)
+python scripts/import_to_neo4j.py fronx
+
+# Run analysis using Neo4j backend
+python scripts/analyze_from_neo4j.py fronx
+```
+
+**Key features**:
+- **OpenAI embeddings**: 10% better quality (MTEB 62.3 vs 56.3) for ~$0.0004/graph
+- **Vector indexes**: Built-in semantic similarity search
+- **Scalability**: Better performance for 100+ person networks
+- **Cypher queries**: Rich graph traversals for future features
+
+See [docs/NEO4J_BACKEND.md](docs/NEO4J_BACKEND.md) for setup and usage details.
+
 ### Testing
 
 No test suite exists yet. When creating tests, use pytest:
@@ -126,6 +178,12 @@ The system computes six metrics to help navigate your network:
 **src/translation_hints.py**: Finds lexical bridges between people's vocabularies using phrase-level semantic alignment
 
 **src/embeddings.py**: ChromaDB integration for phrase embeddings
+
+**src/neo4j_storage.py**: Neo4j Aura backend for graph storage
+- `Neo4jConnection`: Context manager for Neo4j connections
+- `load_ego_graph_from_neo4j()`: Load ego graph from Neo4j (returns EgoData)
+- `save_ego_graph_to_neo4j()`: Save ego graph to Neo4j with OpenAI or local embeddings
+- Supports native vector indexes for semantic similarity search
 
 **src/semantic_flow.py**: Command-line tool for semantic-structural flow analysis
 - Blends structural (edges) and semantic (embeddings) information
