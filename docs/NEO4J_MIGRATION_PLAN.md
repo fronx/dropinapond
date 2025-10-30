@@ -77,45 +77,61 @@ This means:
   GUI
   ```
 
-## Phase 1B: Simplify to Single-Graph Model (Immediate)
+## Phase 1B: Simplify to Single-Graph Model ✓
 
-**Breaking changes needed before Phase 2:**
+**Status:** Completed 2025-10-30
 
-Since we've decided on single-graph model, we need to refactor Phase 1 code first:
+**Breaking changes implemented:**
 
-### File System Changes
-1. Restructure `data/ego_graphs/` directory:
-   - Move `data/ego_graphs/fronx/*` → `data/ego_graphs/`
-   - Remove subdirectory, graph data lives at top level
+Since we've decided on single-graph model, we refactored Phase 1 code:
 
-2. Update [src/storage.py](../src/storage.py):
-   - `load_ego_graph()` no longer takes graph name parameter
-   - Always loads from `data/ego_graphs/` directory
+### File System Changes ✓
+1. Restructured `data/ego_graphs/` → `data/ego_graph/` (singular):
+   - Moved `data/ego_graphs/fronx/*` → `data/ego_graph/`
+   - Removed subdirectory, graph data lives at top level
+   - Updated `.gitignore` to reflect new structure
 
-3. Update [src/semantic_flow.py](../src/semantic_flow.py):
-   - Remove `name` parameter from `Params`
-   - No longer needs to construct path with graph name
+2. Updated [src/storage.py](../src/storage.py):
+   - Uses fixed `"ego_graph"` collection name for ChromaDB
+   - Added duplicate phrase detection with clear error messages
+   - Always loads from `data/ego_graph/` directory
 
-### Neo4j Changes
-1. Update [src/neo4j_storage.py](../src/neo4j_storage.py):
-   - Remove `graph_name` parameter from all functions
-   - Remove `graph_name` property from all Cypher queries
-   - Simplify to: `MATCH (focal:Person {is_focal: true})`
+3. Updated [src/semantic_flow.py](../src/semantic_flow.py):
+   - Removed `name` parameter from `Params`
+   - Simplified command-line interface (no graph name argument)
+   - Writes to `latest.json` instead of `{name}_latest.json`
 
-2. Update Neo4j schema:
-   - Delete all nodes from Phase 1 testing
-   - Re-import without `graph_name` properties
+### Neo4j Changes ✓
+1. Updated [src/neo4j_storage.py](../src/neo4j_storage.py):
+   - Removed `graph_name` parameter from all functions
+   - Removed `graph_name` property from all Cypher queries
+   - Simplified queries: `MATCH (focal:Person {is_focal: true})`
+   - Fixed Cypher syntax for vector property creation
+   - Added progress output during import
+   - Computed weighted mean embeddings in Python (simpler than Cypher)
 
-3. Update [scripts/import_to_neo4j.py](../scripts/import_to_neo4j.py):
-   - Remove `graph_name` argument
+2. Updated Neo4j schema:
+   - Deleted all nodes from Phase 1 testing
+   - Re-imported without `graph_name` properties
+   - Vector indexes created: `person_embedding`, `phrase_embedding`
+
+3. Updated [scripts/import_to_neo4j.py](../scripts/import_to_neo4j.py):
+   - Removed `graph_name` argument
+   - Changed default embedding model to `local` (sentence-transformers)
    - Always imports THE graph (no name needed)
 
-### Testing Phase 1B
-- Verify file-based analysis still works after restructure
-- Re-import to Neo4j with simplified schema
-- Confirm all queries work without `graph_name` filter
+4. Updated [scripts/analyze_from_neo4j.py](../scripts/analyze_from_neo4j.py):
+   - Removed `graph_name` argument
+   - Added note that Phase 2 will integrate Neo4j loading
 
-**Time estimate:** 1-2 hours
+### Testing Phase 1B ✓
+- ✅ File-based analysis works correctly after restructure
+- ✅ Neo4j import successful: 31 nodes, 61 edges with simplified schema
+- ✅ All queries work without `graph_name` filter
+- ✅ Analysis outputs to `latest.json` and timestamped files
+- ✅ Duplicate phrase detection working with clear error messages
+
+**Actual time:** ~2 hours
 
 ## Phase 2: Connect Analysis Pipeline to Neo4j (Next Steps)
 
