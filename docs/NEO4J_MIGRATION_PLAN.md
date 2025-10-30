@@ -150,11 +150,13 @@ Enable the full pipeline:
 
 ### Implementation Plan
 
-#### Step 0: Simplify JSON Analysis Storage ✓
+#### Step 0: Simplify JSON Analysis Storage & GUI for Single-Graph Model ✓
 
 **Status:** Completed 2025-10-30
 
 **Changes made:**
+
+**Analysis Storage:**
 - Updated [src/semantic_flow/serialize.py](../src/semantic_flow/serialize.py):
   - Filenames changed from `latest.json` to `analysis_latest.json`
   - Timestamped files changed from `{ts}.json` to `analysis_{ts}.json`
@@ -163,17 +165,52 @@ Enable the full pipeline:
 - Updated [src/semantic_flow.py](../src/semantic_flow.py):
   - Updated module docstring to reference new `analysis_latest.json` filename
 
+**GUI Simplification:**
+- Updated [gui/src/App.jsx](../gui/src/App.jsx):
+  - Removed HomePage component with graph name input form
+  - Changed route from `/:graphName` to `/` (direct load)
+  - EgoGraphView now renders at root path
+
+- Updated [gui/src/components/EgoGraphView.jsx](../gui/src/components/EgoGraphView.jsx):
+  - Removed `useParams` import and `graphName` variable
+  - Calls `loadEgoGraph()` and `loadLatestAnalysis()` without name parameter
+  - Removed `graphName` from useEffect dependency array
+
 - Updated [gui/src/lib/egoGraphLoader.js](../gui/src/lib/egoGraphLoader.js):
+  - Removed `name` parameter from `loadEgoGraph()` function
+  - Removed `name` parameter from `loadLatestAnalysis()` function
   - Changed `loadEgoGraph()` to use `/data/ego_graph` (single-graph model)
   - Changed `loadLatestAnalysis()` to load from `/data/analyses/analysis_latest.json`
-  - Removed graph name from error messages (single-graph model)
+  - Removed graph name from error messages
+
+**Documentation:**
+- Updated [CLAUDE.md](../CLAUDE.md):
+  - Updated command examples to remove graph name parameter
+  - Updated output file references to `analysis_latest.json`
+
+- Updated [docs/SEMANTIC_FLOW_GUIDE.md](../docs/SEMANTIC_FLOW_GUIDE.md):
+  - Removed graph name from command examples
+  - Updated to reflect single-graph usage
+
+- Updated [docs/NEO4J_BACKEND.md](../docs/NEO4J_BACKEND.md):
+  - Removed all `graph_name` parameters from function signatures
+  - Removed `graph_name` properties from Neo4j schema
+  - Updated vector index names (no graph name suffix)
+  - Updated all Cypher query examples
+  - Updated migration strategy for single-graph model
+  - Added note explaining single-graph model
 
 **Testing:**
 - ✅ Analysis runs successfully and creates `analysis_latest.json`
 - ✅ Timestamped files use new naming: `analysis_20251030_105329.json`
 - ✅ Files appear in GUI's public directory
+- ✅ GUI loads directly to graph visualization without name input
+- ✅ GUI successfully displays graph and analysis data
 
-**Next:** Clean up old analysis files (optional) and proceed to Step 1.
+**Impact:**
+This change completes the UI/UX simplification for the single-graph model. Users now see their ego graph immediately when opening the app, without needing to enter a name. All file paths and naming conventions are consistent with the "one graph per person" philosophy.
+
+**Next:** Proceed to Step 1 (refactor analyze() to accept EgoData).
 
 #### Step 1: Refactor `analyze()` to Accept `EgoData`
 
