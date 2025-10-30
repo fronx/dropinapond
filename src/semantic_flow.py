@@ -5,11 +5,11 @@ Semantic-Structural Flow Analysis
 Blend factual topology (edges.json) with semantic affinity derived from phrase
 embeddings in ChromaDB, then simulate diffusion on the blended graph.
 
-Outputs a JSON under data/analyses/<name>_latest.json that your existing UI
+Outputs a JSON under data/analyses/latest.json that your existing UI
 (EgoGraphView) can already visualize.
 
 Usage:
-    uv run src/semantic_flow.py <graph_name> [--alpha 0.6] [--cos-min 0.2]
+    uv run src/semantic_flow.py [--alpha 0.6] [--cos-min 0.2]
 """
 
 from __future__ import annotations
@@ -39,7 +39,6 @@ from semantic_flow.coherence import compute_coherence as compute_semantic_cohere
 
 @dataclass
 class Params:
-    name: str = "fronx"
     alpha: float = 0.4        # blend: 1.0 = structural only
     cos_min: float = 0.25     # ignore phrase-pair cosine below this
     suggest_k: int = 3        # top-N non-edges suggested per node
@@ -48,7 +47,7 @@ class Params:
 
 def analyze(params: Params) -> Path:
     root = Path(__file__).parent.parent
-    ego_dir = root / "data" / "ego_graphs" / params.name
+    ego_dir = root / "data" / "ego_graph"
     out_dir = params.export_dir or (root / "data" / "analyses")
 
     embedding_service = get_embedding_service()
@@ -58,7 +57,7 @@ def analyze(params: Params) -> Path:
     idx = {nid: i for i, nid in enumerate(nodes)}
 
     S, existing_edges = build_structural_matrix(ego_dir, nodes, idx)
-    phrase_E, phrase_w, mean_vec = load_phrase_data(embedding_service, params.name, nodes)
+    phrase_E, phrase_w, mean_vec = load_phrase_data(embedding_service, "ego_graph", nodes)
     A = compute_semantic_affinity_matrix(S, nodes, phrase_E, phrase_w, cos_min=params.cos_min)
     W = blend_matrices(S, A, params.alpha)
 
@@ -81,7 +80,7 @@ def analyze(params: Params) -> Path:
     # Use 0.3 threshold to catch all potential matches, return top 100
     # GUI will filter by similarity >= 0.65 for "shared" vs "unique"
     phrase_similarities = compute_all_phrase_similarities(
-        embedding_service, params.name, nodes,
+        embedding_service, "ego_graph", nodes,
         similarity_threshold=0.3, top_k=100
     )
 
@@ -92,7 +91,7 @@ def analyze(params: Params) -> Path:
     phrase_contributions = {}
     for neighbor_id in nodes[1:]:
         contributions = compute_phrase_contribution_breakdown(
-            embedding_service, params.name, focal_id, neighbor_id,
+            embedding_service, "ego_graph", focal_id, neighbor_id,
             cos_min=params.cos_min, top_k=10
         )
         if contributions:
@@ -107,26 +106,22 @@ def analyze(params: Params) -> Path:
     # Compute standout for all neighbors (function already filters to positive scores)
     for neighbor_id in neighbor_ids:
         standout = compute_standout_phrases(
-            embedding_service, params.name, focal_id, neighbor_id,
+            embedding_service, "ego_graph", focal_id, neighbor_id,
             neighbor_ids, cos_min=params.cos_min, top_k=5
         )
         if standout:
             standout_phrases[neighbor_id] = standout
 
     analysis = build_analysis_output(
-        params.name, vars(params), S, A, W, F, D, F_MB, E_MB, clusters, suggestions, nodes, coherence, phrase_similarities, phrase_contributions, standout_phrases
+        None, vars(params), S, A, W, F, D, F_MB, E_MB, clusters, suggestions, nodes, coherence, phrase_similarities, phrase_contributions, standout_phrases
     )
 
-    return write_analysis(analysis, out_dir, params.name)
+    return write_analysis(analysis, out_dir, None)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: uv run src/semantic_flow.py <graph_name> [--alpha 0.4] [--cos-min 0.25]")
-        sys.exit(1)
-
-    params = Params(name=sys.argv[1])
-    for i, arg in enumerate(sys.argv[2:], start=2):
+    params = Params()
+    for i, arg in enumerate(sys.argv[1:], start=1):
         if arg == "--alpha" and i + 1 < len(sys.argv):
             params.alpha = float(sys.argv[i + 1])
         elif arg == "--cos-min" and i + 1 < len(sys.argv):

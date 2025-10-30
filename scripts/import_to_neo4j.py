@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Import ego graphs from JSON files to Neo4j Aura.
+"""Import ego graph from JSON files to Neo4j Aura (single-graph model).
 
 Usage:
-    python scripts/import_to_neo4j.py <graph_name> [--clear-existing]
+    python scripts/import_to_neo4j.py [--clear-existing]
 
 Examples:
-    # Import the 'fronx' graph
-    python scripts/import_to_neo4j.py fronx
+    # Import the ego graph
+    python scripts/import_to_neo4j.py
 
     # Import and replace existing graph
-    python scripts/import_to_neo4j.py fronx --clear-existing
+    python scripts/import_to_neo4j.py --clear-existing
 
 Environment variables required:
     NEO4J_ID (or NEO4J_URI): Neo4j instance ID or connection URI
@@ -81,28 +81,24 @@ def load_contact_points(ego_graph_dir: Path) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Import ego graph from JSON files to Neo4j Aura'
-    )
-    parser.add_argument(
-        'graph_name',
-        help='Name of the ego graph to import (subdirectory in data/ego_graphs/)'
+        description='Import ego graph from JSON files to Neo4j Aura (single-graph model)'
     )
     parser.add_argument(
         '--clear-existing',
         action='store_true',
-        help='Clear existing graph with same name before importing'
+        help='Clear existing graph before importing'
     )
     parser.add_argument(
         '--data-dir',
         type=Path,
-        default=Path('data/ego_graphs'),
-        help='Directory containing ego graph data (default: data/ego_graphs)'
+        default=Path('data/ego_graph'),
+        help='Directory containing ego graph data (default: data/ego_graph)'
     )
     parser.add_argument(
         '--embedding-model',
         choices=['openai', 'local'],
-        default='openai',
-        help='Embedding model to use: openai (recommended) or local (sentence-transformers)'
+        default='local',
+        help='Embedding model to use: openai or local (sentence-transformers, default)'
     )
     parser.add_argument(
         '--openai-model',
@@ -113,12 +109,12 @@ def main():
     args = parser.parse_args()
 
     # Verify graph directory exists
-    ego_graph_dir = args.data_dir / args.graph_name
+    ego_graph_dir = args.data_dir
     if not ego_graph_dir.exists():
         print(f"Error: Graph directory not found: {ego_graph_dir}")
         sys.exit(1)
 
-    print(f"Importing ego graph '{args.graph_name}' to Neo4j...")
+    print(f"Importing ego graph to Neo4j...")
 
     # Load ego graph using existing loader (gets EgoData structure)
     print("  Loading graph from JSON files...")
@@ -139,7 +135,6 @@ def main():
     print(f"  Saving to Neo4j (using {args.embedding_model} embeddings)...")
     try:
         save_ego_graph_to_neo4j(
-            graph_name=args.graph_name,
             ego_data=ego_data,
             node_details=node_details,
             contact_points=contact_points,
@@ -147,7 +142,7 @@ def main():
             openai_model=args.openai_model,
             clear_existing=args.clear_existing
         )
-        print(f"\nSuccessfully imported '{args.graph_name}' to Neo4j!")
+        print(f"\nSuccessfully imported ego graph to Neo4j!")
         print(f"  Focal node: {ego_data.focal} ({ego_data.names[ego_data.focal]})")
         print(f"  Total nodes: {len(ego_data.nodes)}")
         print(f"  Total edges: {len(list(ego_data.edges))}")

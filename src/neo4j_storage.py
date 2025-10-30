@@ -1,11 +1,11 @@
-"""Neo4j Aura backend for Drop in a Pond ego graphs.
+"""Neo4j Aura backend for Drop in a Pond ego graphs (single-graph model).
 
 This module provides an alternative storage backend using Neo4j graph database,
 while maintaining compatibility with the existing EgoData structure used by
 the analysis pipeline.
 
 Graph Schema:
-- Person nodes: {id, name, is_focal, graph_name, embedding: LIST<FLOAT>}
+- Person nodes: {id, name, is_focal, embedding: LIST<FLOAT>}
 - Phrase nodes: {text, weight, last_updated, embedding: LIST<FLOAT>}
 - Relationships:
   - (Person)-[:HAS_PHRASE]->(Phrase)
@@ -15,7 +15,7 @@ Graph Schema:
   - (Person)-[:AVAILABILITY {date, score, content}]->(Person)
 
 Contact points are stored as Event nodes:
-- Event nodes: {type, date, content, graph_name}
+- Event nodes: {type, date, content}
 - (Event)-[:INVOLVES]->(Person)
 
 Embedding Options:
@@ -88,17 +88,16 @@ class Neo4jConnection:
             self.driver.close()
 
 
-def _create_vector_indexes(session, graph_name: str, embedding_dim: int):
+def _create_vector_indexes(session, embedding_dim: int):
     """Create vector indexes for Person and Phrase embeddings if they don't exist.
 
     Args:
         session: Neo4j session
-        graph_name: Name of the graph (used in index name)
         embedding_dim: Dimension of embedding vectors (384 or 1536)
     """
     # Index for Person node embeddings
     session.run(f"""
-        CREATE VECTOR INDEX person_embedding_{graph_name} IF NOT EXISTS
+        CREATE VECTOR INDEX person_embedding IF NOT EXISTS
         FOR (p:Person)
         ON p.embedding
         OPTIONS {{
@@ -111,7 +110,7 @@ def _create_vector_indexes(session, graph_name: str, embedding_dim: int):
 
     # Index for Phrase node embeddings
     session.run(f"""
-        CREATE VECTOR INDEX phrase_embedding_{graph_name} IF NOT EXISTS
+        CREATE VECTOR INDEX phrase_embedding IF NOT EXISTS
         FOR (phrase:Phrase)
         ON phrase.embedding
         OPTIONS {{
@@ -124,17 +123,15 @@ def _create_vector_indexes(session, graph_name: str, embedding_dim: int):
 
 
 def load_ego_graph_from_neo4j(
-    graph_name: str,
     uri: Optional[str] = None,
     username: Optional[str] = None,
     password: Optional[str] = None
 ) -> EgoData:
-    """Load an ego graph from Neo4j Aura and return EgoData structure.
+    """Load the ego graph from Neo4j Aura and return EgoData structure (single-graph model).
 
     Embeddings are loaded directly from Neo4j (no external embedding service needed).
 
     Args:
-        graph_name: Name of the ego graph (stored as graph_name property on nodes)
         uri: Neo4j connection URI
         username: Neo4j username
         password: Neo4j password
@@ -144,24 +141,24 @@ def load_ego_graph_from_neo4j(
     """
     with Neo4jConnection(uri, username, password) as driver:
         with driver.session() as session:
-            # Find focal node
+            # Find focal node (single-graph model: only one focal node exists)
             result = session.run("""
-                MATCH (focal:Person {graph_name: $graph_name, is_focal: true})
+                MATCH (focal:Person {is_focal: true})
                 RETURN focal.id as id, focal.name as name
-            """, graph_name=graph_name)
+            """)
 
             focal_record = result.single()
             if not focal_record:
-                raise ValueError(f"No focal node found for graph '{graph_name}'")
+                raise ValueError("No focal node found in Neo4j")
 
             focal_id = focal_record['id']
 
             # Get all nodes with embeddings
             result = session.run("""
-                MATCH (p:Person {graph_name: $graph_name})
+                MATCH (p:Person)
                 RETURN p.id as id, p.name as name, p.embedding as embedding
                 ORDER BY p.id
-            """, graph_name=graph_name)
+            """)
 
             nodes = []
             names = {}
@@ -181,11 +178,10 @@ def load_ego_graph_from_neo4j(
 
             # Get edges
             result = session.run("""
-                MATCH (p1:Person {graph_name: $graph_name})
-                      -[r:CONNECTED_TO]->(p2:Person {graph_name: $graph_name})
+                MATCH (p1:Person)-[r:CONNECTED_TO]->(p2:Person)
                 RETURN p1.id as source, p2.id as target,
                        r.actual as actual, r.channels as channels
-            """, graph_name=graph_name)
+            """)
 
             edges = []
             for record in result:
@@ -204,7 +200,6 @@ def load_ego_graph_from_neo4j(
 
 
 def save_ego_graph_to_neo4j(
-    graph_name: str,
     ego_data: EgoData,
     node_details: Dict[str, Dict],
     contact_points: Optional[Dict] = None,
@@ -217,10 +212,9 @@ def save_ego_graph_to_neo4j(
     openai_dimensions: Optional[int] = None,
     clear_existing: bool = True
 ) -> None:
-    """Save an ego graph to Neo4j Aura with embeddings.
+    """Save the ego graph to Neo4j Aura with embeddings (single-graph model).
 
     Args:
-        graph_name: Name identifier for the graph
         ego_data: EgoData structure with nodes, edges, embeddings
         node_details: Dict mapping node_id to details (phrases, capabilities, notes, etc.)
         contact_points: Optional dict with past/present/potential contact events
@@ -231,7 +225,7 @@ def save_ego_graph_to_neo4j(
         embedding_model: 'openai' (recommended) or 'local' (sentence-transformers)
         openai_model: OpenAI model name (default: text-embedding-3-small)
         openai_dimensions: Optional dimension reduction for OpenAI embeddings
-        clear_existing: If True, delete existing graph with same name first
+        clear_existing: If True, delete existing graph data first
     """
     if embedding_model == 'openai':
         if not openai_token:
@@ -260,28 +254,32 @@ def save_ego_graph_to_neo4j(
         with driver.session() as session:
             # Clear existing graph if requested
             if clear_existing:
+                print("    Clearing existing graph data...")
                 session.run("""
-                    MATCH (n {graph_name: $graph_name})
+                    MATCH (n)
                     DETACH DELETE n
-                """, graph_name=graph_name)
+                """)
 
             # Create Person nodes
+            print(f"    Creating {len(ego_data.nodes)} Person nodes...")
             for node_id in ego_data.nodes:
                 is_focal = (node_id == ego_data.focal)
                 name = ego_data.names.get(node_id, node_id)
 
                 session.run("""
                     CREATE (p:Person {
-                        graph_name: $graph_name,
                         id: $id,
                         name: $name,
                         is_focal: $is_focal
                     })
-                """, graph_name=graph_name, id=node_id, name=name, is_focal=is_focal)
+                """, id=node_id, name=name, is_focal=is_focal)
 
             # Add phrases and compute embeddings
-            for node_id, details in node_details.items():
+            print(f"    Adding phrases and computing embeddings for {len(node_details)} nodes...")
+            for idx, (node_id, details) in enumerate(node_details.items(), 1):
+                name = ego_data.names.get(node_id, node_id) if ego_data.names else node_id
                 phrases = details.get('phrases', [])
+                print(f"      [{idx}/{len(node_details)}] {name}: {len(phrases)} phrases")
 
                 if embedding_model == 'openai':
                     # Batch compute phrase embeddings using Neo4j genai procedures
@@ -304,17 +302,17 @@ def save_ego_graph_to_neo4j(
                         # Create phrase nodes with embeddings
                         for i, phrase in enumerate(phrases):
                             session.run("""
-                                MATCH (p:Person {graph_name: $graph_name, id: $node_id})
+                                MATCH (p:Person {id: $node_id})
                                 CREATE (phrase:Phrase {
-                                    graph_name: $graph_name,
                                     text: $text,
                                     weight: $weight,
                                     last_updated: $last_updated
                                 })
+                                WITH phrase, p
                                 CALL db.create.setNodeVectorProperty(phrase, 'embedding', $embedding)
+                                WITH phrase, p
                                 CREATE (p)-[:HAS_PHRASE]->(phrase)
                             """,
-                            graph_name=graph_name,
                             node_id=node_id,
                             text=phrase['text'],
                             weight=phrase.get('weight', 1.0),
@@ -324,33 +322,36 @@ def save_ego_graph_to_neo4j(
 
                     # Compute Person embedding as weighted mean of phrase embeddings
                     if phrases:
-                        session.run("""
-                            MATCH (p:Person {graph_name: $graph_name, id: $node_id})
-                                  -[:HAS_PHRASE]->(phrase:Phrase)
-                            WITH p,
-                                 sum(phrase.weight) as total_weight,
-                                 [i IN range(0, size(phrase.embedding)-1) |
-                                     sum([inner_phrase IN collect(phrase) |
-                                         inner_phrase.embedding[i] * inner_phrase.weight]) /
-                                     sum([inner_phrase IN collect(phrase) | inner_phrase.weight])
-                                 ] as mean_embedding
-                            CALL db.create.setNodeVectorProperty(p, 'embedding', mean_embedding)
-                        """, graph_name=graph_name, node_id=node_id)
+                        # Fetch phrase embeddings and weights, compute mean in Python
+                        result = session.run("""
+                            MATCH (p:Person {id: $node_id})-[:HAS_PHRASE]->(phrase:Phrase)
+                            RETURN phrase.embedding as embedding, phrase.weight as weight
+                        """, node_id=node_id)
+
+                        phrase_data = [(r['embedding'], r['weight']) for r in result]
+                        if phrase_data:
+                            import numpy as np
+                            embeddings_array = np.array([e for e, w in phrase_data])
+                            weights_array = np.array([w for e, w in phrase_data])
+                            mean_embedding = np.average(embeddings_array, axis=0, weights=weights_array).tolist()
+
+                            session.run("""
+                                MATCH (p:Person {id: $node_id})
+                                CALL db.create.setNodeVectorProperty(p, 'embedding', $embedding)
+                            """, node_id=node_id, embedding=mean_embedding)
 
                 else:
                     # Local embeddings - use pre-computed from ego_data
                     for phrase in phrases:
                         session.run("""
-                            MATCH (p:Person {graph_name: $graph_name, id: $node_id})
+                            MATCH (p:Person {id: $node_id})
                             CREATE (phrase:Phrase {
-                                graph_name: $graph_name,
                                 text: $text,
                                 weight: $weight,
                                 last_updated: $last_updated
                             })
                             CREATE (p)-[:HAS_PHRASE]->(phrase)
                         """,
-                        graph_name=graph_name,
                         node_id=node_id,
                         text=phrase['text'],
                         weight=phrase.get('weight', 1.0),
@@ -361,29 +362,28 @@ def save_ego_graph_to_neo4j(
                     if node_id in ego_data.embeddings and ego_data.embeddings[node_id] is not None:
                         embedding_list = ego_data.embeddings[node_id].tolist()
                         session.run("""
-                            MATCH (p:Person {graph_name: $graph_name, id: $node_id})
+                            MATCH (p:Person {id: $node_id})
                             CALL db.create.setNodeVectorProperty(p, 'embedding', $embedding)
-                        """, graph_name=graph_name, node_id=node_id, embedding=embedding_list)
+                        """, node_id=node_id, embedding=embedding_list)
 
                 # Add capabilities
                 capabilities = details.get('capabilities', [])
                 for capability in capabilities:
                     session.run("""
-                        MATCH (p:Person {graph_name: $graph_name, id: $node_id})
+                        MATCH (p:Person {id: $node_id})
                         MERGE (p)-[:HAS_CAPABILITY {capability: $capability}]->(p)
-                    """, graph_name=graph_name, node_id=node_id, capability=capability)
+                    """, node_id=node_id, capability=capability)
 
                 # Add notes
                 notes = details.get('notes', [])
                 for note in notes:
                     session.run("""
-                        MATCH (p:Person {graph_name: $graph_name, id: $node_id})
+                        MATCH (p:Person {id: $node_id})
                         CREATE (p)-[:HAS_NOTE {
                             date: $date,
                             content: $content
                         }]->(p)
                     """,
-                    graph_name=graph_name,
                     node_id=node_id,
                     date=note['date'],
                     content=note['content']
@@ -393,14 +393,13 @@ def save_ego_graph_to_neo4j(
                 availability = details.get('availability', [])
                 for avail in availability:
                     session.run("""
-                        MATCH (p:Person {graph_name: $graph_name, id: $node_id})
+                        MATCH (p:Person {id: $node_id})
                         CREATE (p)-[:AVAILABILITY {
                             date: $date,
                             score: $score,
                             content: $content
                         }]->(p)
                     """,
-                    graph_name=graph_name,
                     node_id=node_id,
                     date=avail['date'],
                     score=avail['score'],
@@ -408,6 +407,7 @@ def save_ego_graph_to_neo4j(
                     )
 
             # Create edges
+            print(f"    Creating {len(list(ego_data.edges))} edges...")
             for edge in ego_data.edges:
                 source, target, edge_data = edge[0], edge[1], edge[2] if len(edge) > 2 else {}
 
@@ -419,14 +419,13 @@ def save_ego_graph_to_neo4j(
                     channels = []
 
                 session.run("""
-                    MATCH (p1:Person {graph_name: $graph_name, id: $source})
-                    MATCH (p2:Person {graph_name: $graph_name, id: $target})
+                    MATCH (p1:Person {id: $source})
+                    MATCH (p2:Person {id: $target})
                     CREATE (p1)-[:CONNECTED_TO {
                         actual: $actual,
                         channels: $channels
                     }]->(p2)
                 """,
-                graph_name=graph_name,
                 source=source,
                 target=target,
                 actual=actual,
@@ -435,20 +434,19 @@ def save_ego_graph_to_neo4j(
 
             # Add contact points as Event nodes
             if contact_points:
+                print(f"    Adding contact points...")
                 for event_type in ['past', 'present', 'potential']:
                     events = contact_points.get(event_type, [])
                     for event in events:
-                        event_id = f"{graph_name}_{event_type}_{hash(event['content'])}"
+                        event_id = f"{event_type}_{hash(event['content'])}"
                         session.run("""
                             CREATE (e:Event {
-                                graph_name: $graph_name,
                                 id: $event_id,
                                 type: $event_type,
                                 date: $date,
                                 content: $content
                             })
                         """,
-                        graph_name=graph_name,
                         event_id=event_id,
                         event_type=event_type,
                         date=event.get('date', ''),
@@ -458,14 +456,15 @@ def save_ego_graph_to_neo4j(
                         people = event.get('people', [])
                         for person_id in people:
                             session.run("""
-                                MATCH (e:Event {graph_name: $graph_name, id: $event_id})
-                                MATCH (p:Person {graph_name: $graph_name, id: $person_id})
+                                MATCH (e:Event {id: $event_id})
+                                MATCH (p:Person {id: $person_id})
                                 CREATE (e)-[:INVOLVES]->(p)
                             """,
-                            graph_name=graph_name,
                             event_id=event_id,
                             person_id=person_id
                             )
 
             # Create vector indexes for similarity search
-            _create_vector_indexes(session, graph_name, embedding_dim)
+            print(f"    Creating vector indexes...")
+            _create_vector_indexes(session, embedding_dim)
+            print(f"    Done!")

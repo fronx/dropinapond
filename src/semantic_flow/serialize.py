@@ -123,7 +123,7 @@ def build_edge_fields_blanket(
 
 
 def build_analysis_output(
-    graph_name: str,
+    graph_name: Optional[str],
     params: dict,
     S: np.ndarray,
     A: np.ndarray,
@@ -141,10 +141,10 @@ def build_analysis_output(
     standout_phrases: Optional[Dict] = None,
 ) -> dict:
     """
-    Assemble complete analysis output for JSON export.
+    Assemble complete analysis output for JSON export (single-graph model).
 
     Args:
-        graph_name: Name of the ego graph
+        graph_name: Name of the ego graph (deprecated, pass None for single-graph model)
         params: Analysis parameters dict
         S: Structural matrix
         A: Semantic affinity matrix
@@ -166,7 +166,6 @@ def build_analysis_output(
     """
     metrics = {
         "version": "semantic-flow-1.0",
-        "ego_graph_file": graph_name,
         "parameters": params,
         "metrics": {
             "clusters": clusters,
@@ -192,22 +191,29 @@ def build_analysis_output(
     return metrics
 
 
-def write_analysis(analysis: dict, out_dir: Path, name: str) -> Path:
+def write_analysis(analysis: dict, out_dir: Path, name: Optional[str]) -> Path:
     """
-    Write analysis to both timestamped and latest files.
+    Write analysis to both timestamped and latest files (single-graph model).
 
     Args:
         analysis: Analysis dict to serialize
         out_dir: Output directory
-        name: Graph name for filename
+        name: Graph name for filename (deprecated, pass None for single-graph model)
 
     Returns:
         Path to latest file
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    ts_path = out_dir / f"{name}_{ts}.json"
-    latest_path = out_dir / f"{name}_latest.json"
+
+    # Single-graph model: use fixed filenames
+    if name is None:
+        ts_path = out_dir / f"{ts}.json"
+        latest_path = out_dir / "latest.json"
+    else:
+        # Legacy multi-graph support
+        ts_path = out_dir / f"{name}_{ts}.json"
+        latest_path = out_dir / f"{name}_latest.json"
 
     for path in [ts_path, latest_path]:
         with open(path, "w") as f:

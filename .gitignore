@@ -30,9 +30,9 @@ env/
 # ChromaDB
 chroma_db/
 
-# User ego graphs (keep private)
-data/ego_graphs/*
-!data/ego_graphs/.gitkeep
+# User ego graph (keep private, single-graph model)
+data/ego_graph/*
+!data/ego_graph/.gitkeep
 
 # Analysis results (generated files)
 data/analyses/

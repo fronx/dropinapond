@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""Run semantic flow analysis using Neo4j as the data source.
+"""Run semantic flow analysis using Neo4j as the data source (single-graph model).
 
-This demonstrates how to use the Neo4j backend as a drop-in replacement
-for the file-based storage, with no changes to the analysis pipeline.
+NOTE: Currently loads from file-based storage. Phase 2 will integrate Neo4j loading.
 
 Usage:
-    python scripts/analyze_from_neo4j.py <graph_name>
-
-Example:
-    python scripts/analyze_from_neo4j.py fronx
+    python scripts/analyze_from_neo4j.py
 
 Environment variables required:
     NEO4J_ID (or NEO4J_URI): Neo4j instance ID or connection URI
@@ -27,17 +23,12 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.neo4j_storage import load_ego_graph_from_neo4j
-from src.embeddings import get_embedding_service
-from src.semantic_flow import run_analysis
+from src.semantic_flow import analyze, Params
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Run semantic flow analysis using Neo4j backend'
-    )
-    parser.add_argument(
-        'graph_name',
-        help='Name of the ego graph in Neo4j'
+        description='Run semantic flow analysis using Neo4j backend (single-graph model)'
     )
     parser.add_argument(
         '--alpha',
@@ -60,30 +51,21 @@ def main():
 
     args = parser.parse_args()
 
-    print(f"Loading ego graph '{args.graph_name}' from Neo4j...")
+    print(f"Running semantic flow analysis from file-based storage...")
+    print("NOTE: Phase 2 will load from Neo4j instead")
 
     try:
-        # Load from Neo4j
-        embedding_service = get_embedding_service()
-        ego_data = load_ego_graph_from_neo4j(
-            graph_name=args.graph_name,
-            embedding_service=embedding_service
-        )
+        # Note: The analyze() function internally loads from file-based storage
+        # Phase 2 will refactor analyze() to accept ego_data from Neo4j
 
-        print(f"Loaded {len(ego_data.nodes)} nodes, {len(list(ego_data.edges))} edges")
-        print(f"Focal node: {ego_data.focal} ({ego_data.names[ego_data.focal]})")
-
-        # Run analysis (same as with file-based storage)
-        print("\nRunning semantic flow analysis...")
-        run_analysis(
-            ego_data=ego_data,
-            graph_name=args.graph_name,
+        params = Params(
             alpha=args.alpha,
             cos_min=args.cos_min,
-            output_dir=args.output_dir
+            export_dir=args.output_dir
         )
 
-        print(f"\nAnalysis complete! Results saved to {args.output_dir}")
+        output_path = analyze(params)
+        print(f"\nAnalysis complete! Results saved to {output_path}")
 
     except Exception as e:
         print(f"\nError: {e}")

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Iterable, Tuple, Optional
 import json
 import numpy as np
+from collections import Counter
 
 from dataclasses import dataclass
 
@@ -82,9 +83,9 @@ def load_ego_graph(
     embedding_service
 ) -> EgoData:
     """
-    Load ego graph from v0.2 modular directory structure.
+    Load ego graph from v0.2 modular directory structure (single-graph model).
 
-    Expected structure:
+    Expected structure (directory = data/ego_graph/):
     directory/
       metadata.json
       self.json
@@ -96,7 +97,7 @@ def load_ego_graph(
       contact_points.json  # not used in EgoData, but part of schema
 
     Args:
-        directory: Path to modular ego graph directory
+        directory: Path to ego graph directory (typically data/ego_graph/)
         embedding_service: EmbeddingService instance (required)
 
     Returns:
@@ -138,8 +139,8 @@ def load_ego_graph(
     with open(directory / "edges.json") as f:
         edges_data = json.load(f)
 
-    # Use directory name as graph name
-    graph_name = directory.name
+    # Single-graph model: use fixed collection name for ChromaDB
+    graph_name = "ego_graph"
 
     # Process nodes and compute mean embeddings from phrases
     nodes = []
@@ -159,9 +160,19 @@ def load_ego_graph(
             continue
 
         # Extract phrase texts and weights
+        phrase_texts = [p["text"] for p in phrases]
+
+        # Validate: check for duplicate phrases
+        phrase_counts = Counter(phrase_texts)
+        duplicates = [text for text, count in phrase_counts.items() if count > 1]
+        if duplicates:
+            raise ValueError(
+                f"Duplicate phrases found in node '{node_id}' ({names.get(node_id, node_id)}): "
+                f"{duplicates}. Each phrase text must be unique within a node."
+            )
+
         # Use content-based IDs (hash of text) so changes to phrase text are detected
         import hashlib
-        phrase_texts = [p["text"] for p in phrases]
         phrase_ids = [
             f"{node_id}:{hashlib.sha256(text.encode()).hexdigest()[:16]}"
             for text in phrase_texts
