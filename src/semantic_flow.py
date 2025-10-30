@@ -5,7 +5,7 @@ Semantic-Structural Flow Analysis
 Blend factual topology (edges.json) with semantic affinity derived from phrase
 embeddings in ChromaDB, then simulate diffusion on the blended graph.
 
-Outputs a JSON under data/analyses/latest.json that your existing UI
+Outputs a JSON under data/analyses/analysis_latest.json that your existing UI
 (EgoGraphView) can already visualize.
 
 Usage:

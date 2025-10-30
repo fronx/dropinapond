@@ -133,7 +133,7 @@ Since we've decided on single-graph model, we refactored Phase 1 code:
 
 **Actual time:** ~2 hours
 
-## Phase 2: Connect Analysis Pipeline to Neo4j (Next Steps)
+## Phase 2: Connect Analysis Pipeline to Neo4j (In Progress)
 
 ### Goal
 
@@ -149,6 +149,31 @@ Enable the full pipeline:
 **No schema changes needed:** Neo4j stores graph, JSON stores analysis - clean separation.
 
 ### Implementation Plan
+
+#### Step 0: Simplify JSON Analysis Storage ✓
+
+**Status:** Completed 2025-10-30
+
+**Changes made:**
+- Updated [src/semantic_flow/serialize.py](../src/semantic_flow/serialize.py):
+  - Filenames changed from `latest.json` to `analysis_latest.json`
+  - Timestamped files changed from `{ts}.json` to `analysis_{ts}.json`
+  - Updated docstrings to reflect new naming convention
+
+- Updated [src/semantic_flow.py](../src/semantic_flow.py):
+  - Updated module docstring to reference new `analysis_latest.json` filename
+
+- Updated [gui/src/lib/egoGraphLoader.js](../gui/src/lib/egoGraphLoader.js):
+  - Changed `loadEgoGraph()` to use `/data/ego_graph` (single-graph model)
+  - Changed `loadLatestAnalysis()` to load from `/data/analyses/analysis_latest.json`
+  - Removed graph name from error messages (single-graph model)
+
+**Testing:**
+- ✅ Analysis runs successfully and creates `analysis_latest.json`
+- ✅ Timestamped files use new naming: `analysis_20251030_105329.json`
+- ✅ Files appear in GUI's public directory
+
+**Next:** Clean up old analysis files (optional) and proceed to Step 1.
 
 #### Step 1: Refactor `analyze()` to Accept `EgoData`
 

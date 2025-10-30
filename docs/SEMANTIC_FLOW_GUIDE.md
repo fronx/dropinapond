@@ -1,18 +1,17 @@
 **Socio‑Semantic Guide to Semantic Flow**
-- Output file: `data/analyses/<name>_latest.json` (example: `data/analyses/fronx_latest.json`)
+- Output file: `data/analyses/analysis_latest.json` (single-graph model)
 - Generator: `src/semantic_flow.py`
 
 This guide explains what each number means socially and semantically, using the actual field names present in the JSON.
 
 **Generating the Analysis**
 ```bash
-uv run src/semantic_flow.py <name> [--alpha 0.4] [--cos-min 0.25]
+uv run python src/semantic_flow.py [--alpha 0.4] [--cos-min 0.25]
 ```
-- `<name>`: Name of your ego graph (e.g., `fronx` looks for `data/ego_graphs/fronx/`)
 - `--alpha`: Blending weight (default 0.4). Higher = more structural, lower = more semantic
 - `--cos-min`: Minimum phrase similarity threshold (default 0.25)
 
-Output written to `data/analyses/<name>_latest.json` with timestamped backup.
+Output written to `data/analyses/analysis_latest.json` with timestamped backup (`analysis_YYYYMMDD_HHMMSS.json`).
 
 **Orientation**
 - `version`, `ego_graph_file`, `parameters` describe the run context.

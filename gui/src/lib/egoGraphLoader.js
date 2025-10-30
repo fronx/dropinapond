@@ -20,12 +20,13 @@ function generateClusterColors(count) {
 const FOCAL_NODE_COLOR = '#777777';
 
 /**
- * Loads ego graph JSON data from the modular directory structure
+ * Loads ego graph JSON data from the modular directory structure (single-graph model)
  */
 export async function loadEgoGraph(name) {
   try {
     // Load all files from the modular format
-    const basePath = `/data/ego_graphs/${name}`;
+    // Single-graph model: data lives in /data/ego_graph/ (no subdirectory)
+    const basePath = `/data/ego_graph`;
 
     const [metadataRes, selfRes, edgesRes, contactPointsRes] = await Promise.all([
       fetch(`${basePath}/metadata.json`),
@@ -85,29 +86,24 @@ export async function loadEgoGraph(name) {
       contact_points: contactPoints
     };
   } catch (error) {
-    console.error(`Error loading ego graph "${name}":`, error);
+    console.error('Error loading ego graph:', error);
     throw error;
   }
 }
 
 /**
- * Loads the latest analysis JSON for a given ego graph
+ * Loads the latest analysis JSON (single-graph model)
  * Returns null if no analysis exists
  */
 export async function loadLatestAnalysis(name) {
   try {
-    // Try to load analyses directory listing (you'll need to implement a way to find the latest file)
-    // For now, we'll construct the expected latest filename pattern
-    // In production, you might want to maintain a "latest.json" symlink or index file
-
-    // For now, try to fetch with a wildcard approach or accept it might fail
-    // We'll implement a simple approach: look for a _latest.json file
-    const url = `/data/analyses/${name}_latest.json`;
+    // Single-graph model: analysis is always at analysis_latest.json
+    const url = `/data/analyses/analysis_latest.json`;
     console.log('Fetching analysis from:', url);
     const response = await fetch(url);
     console.log('Analysis fetch response:', response.status, response.ok);
     if (!response.ok) {
-      console.warn(`No analysis found for "${name}", proceeding without analysis data`);
+      console.warn('No analysis found, proceeding without analysis data');
       return null;
     }
 
@@ -121,7 +117,7 @@ export async function loadLatestAnalysis(name) {
     console.log('Analysis data loaded:', data);
     return data;
   } catch (error) {
-    console.error(`Could not load analysis for "${name}":`, error);
+    console.error('Could not load analysis:', error);
     return null;
   }
 }

@@ -195,21 +195,25 @@ def write_analysis(analysis: dict, out_dir: Path, name: Optional[str]) -> Path:
     """
     Write analysis to both timestamped and latest files (single-graph model).
 
+    Creates:
+        - analysis_YYYYMMDD_HHMMSS.json (timestamped snapshot)
+        - analysis_latest.json (symlink to most recent)
+
     Args:
         analysis: Analysis dict to serialize
         out_dir: Output directory
         name: Graph name for filename (deprecated, pass None for single-graph model)
 
     Returns:
-        Path to latest file
+        Path to latest file (analysis_latest.json)
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Single-graph model: use fixed filenames
     if name is None:
-        ts_path = out_dir / f"{ts}.json"
-        latest_path = out_dir / "latest.json"
+        ts_path = out_dir / f"analysis_{ts}.json"
+        latest_path = out_dir / "analysis_latest.json"
     else:
         # Legacy multi-graph support
         ts_path = out_dir / f"{name}_{ts}.json"
