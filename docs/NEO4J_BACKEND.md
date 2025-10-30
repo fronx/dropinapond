@@ -2,6 +2,8 @@
 
 This document describes how to use Neo4j Aura as an alternative storage backend for ego graphs in Drop in a Pond.
 
+**Note:** This documentation reflects the **single-graph model** introduced in Phase 1B. The system now supports exactly one ego graph (your own epistemic graph), eliminating the need for graph names in all operations.
+
 ## Overview
 
 Neo4j Aura provides a cloud-hosted graph database that offers several advantages for Drop in a Pond:
@@ -68,7 +70,6 @@ Neo4j backend supports two embedding strategies:
 **Configuration:**
 ```python
 save_ego_graph_to_neo4j(
-    graph_name='alice',
     embedding_model='openai',
     openai_model='text-embedding-3-small',
     openai_dimensions=1536  # optional: reduce dimensions
@@ -88,43 +89,42 @@ save_ego_graph_to_neo4j(
 **Configuration:**
 ```python
 save_ego_graph_to_neo4j(
-    graph_name='alice',
     embedding_model='local'
 )
 ```
 
 ### Comparison
 
-| Feature | OpenAI | Local |
-|---------|--------|-------|
-| **Quality (MTEB)** | 62.3 | 56.3 |
-| **Dimensions** | 1536 | 384 |
-| **Cost per graph** | ~$0.0004 | Free |
-| **Latency** | 100-500ms | 10-100ms |
-| **Privacy** | API call | Fully local |
-| **Offline** | No | Yes |
+| Feature            | OpenAI    | Local       |
+| ------------------ | --------- | ----------- |
+| **Quality (MTEB)** | 62.3      | 56.3        |
+| **Dimensions**     | 1536      | 384         |
+| **Cost per graph** | ~$0.0004  | Free        |
+| **Latency**        | 100-500ms | 10-100ms    |
+| **Privacy**        | API call  | Fully local |
+| **Offline**        | No        | Yes         |
 
 **Recommendation**: Use OpenAI for production graphs where semantic quality matters. Use local for development/testing.
 
 ## Usage
 
-### Importing Existing Graphs to Neo4j
+### Importing Existing Graph to Neo4j
 
-Migrate a JSON-based ego graph to Neo4j:
+Migrate the JSON-based ego graph to Neo4j (single-graph model):
 
 ```bash
 # Import with OpenAI embeddings (recommended)
-python scripts/import_to_neo4j.py fronx
+python scripts/import_to_neo4j.py
 
 # Import with local embeddings
-python scripts/import_to_neo4j.py fronx --embedding-model local
+python scripts/import_to_neo4j.py --embedding-model local
 
 # Replace existing graph
-python scripts/import_to_neo4j.py fronx --clear-existing
+python scripts/import_to_neo4j.py --clear-existing
 ```
 
 The import script:
-1. Loads the ego graph from `data/ego_graphs/<name>/`
+1. Loads the ego graph from `data/ego_graph/`
 2. Computes/retrieves embeddings (based on chosen model)
 3. Creates Neo4j nodes and relationships
 4. Creates vector indexes for similarity search
@@ -134,14 +134,14 @@ The import script:
 Use the Neo4j backend as a drop-in replacement for file-based storage:
 
 ```bash
-python scripts/analyze_from_neo4j.py fronx
+python scripts/analyze_from_neo4j.py
 ```
 
 This:
 1. Loads the ego graph from Neo4j
 2. Returns an `EgoData` structure (same as file-based loader)
 3. Runs the standard semantic flow analysis pipeline
-4. Outputs to `data/analyses/` as usual
+4. Outputs to `data/analyses/analysis_latest.json` as usual
 
 **No changes needed** to the analysis pipeline!
 
@@ -153,15 +153,17 @@ from src.neo4j_storage import (
     save_ego_graph_to_neo4j
 )
 from src.storage import load_ego_graph
+from src.embeddings import get_embedding_service
 
-# Load from Neo4j
-ego_data = load_ego_graph_from_neo4j('fronx')
+# Load from Neo4j (single-graph model)
+ego_data = load_ego_graph_from_neo4j()
 
 # Load from files and save to Neo4j
-ego_data = load_ego_graph('data/ego_graphs/fronx')
+ego_dir = Path('data/ego_graph')
+embedding_service = get_embedding_service()
+ego_data = load_ego_graph(ego_dir, embedding_service)
 node_details = {...}  # Load from JSON files
 save_ego_graph_to_neo4j(
-    graph_name='fronx',
     ego_data=ego_data,
     node_details=node_details,
     embedding_model='openai'
@@ -172,10 +174,9 @@ save_ego_graph_to_neo4j(
 
 ### Nodes
 
-**Person:**
+**Person (single-graph model):**
 ```cypher
 {
-  graph_name: STRING,
   id: STRING,
   name: STRING,
   is_focal: BOOLEAN,
@@ -186,7 +187,6 @@ save_ego_graph_to_neo4j(
 **Phrase:**
 ```cypher
 {
-  graph_name: STRING,
   text: STRING,
   weight: FLOAT,
   last_updated: STRING (ISO timestamp),
@@ -197,7 +197,6 @@ save_ego_graph_to_neo4j(
 **Event:**
 ```cypher
 {
-  graph_name: STRING,
   id: STRING,
   type: STRING,  // 'past', 'present', or 'potential'
   date: STRING,
@@ -216,11 +215,11 @@ save_ego_graph_to_neo4j(
 
 ### Vector Indexes
 
-Automatically created for semantic similarity search:
+Automatically created for semantic similarity search (single-graph model):
 
 ```cypher
 // Person embeddings (for finding similar people)
-CREATE VECTOR INDEX person_embedding_<graph_name>
+CREATE VECTOR INDEX person_embedding
 FOR (p:Person) ON p.embedding
 OPTIONS {
   indexConfig: {
@@ -230,7 +229,7 @@ OPTIONS {
 }
 
 // Phrase embeddings (for finding similar phrases)
-CREATE VECTOR INDEX phrase_embedding_<graph_name>
+CREATE VECTOR INDEX phrase_embedding
 FOR (phrase:Phrase) ON phrase.embedding
 OPTIONS {
   indexConfig: {
@@ -245,9 +244,9 @@ OPTIONS {
 ### Find Similar People
 
 ```cypher
-// Find people most similar to Alice
-MATCH (alice:Person {graph_name: 'my_graph', name: 'Alice'})
-CALL db.index.vector.queryNodes('person_embedding_my_graph', 5, alice.embedding)
+// Find people most similar to Alice (single-graph model)
+MATCH (alice:Person {name: 'Alice'})
+CALL db.index.vector.queryNodes('person_embedding', 5, alice.embedding)
 YIELD node AS similar_person, score
 RETURN similar_person.name, score
 ORDER BY score DESC
@@ -257,8 +256,8 @@ ORDER BY score DESC
 
 ```cypher
 // Find phrases shared between Alice and Bob
-MATCH (alice:Person {graph_name: 'my_graph', name: 'Alice'})-[:HAS_PHRASE]->(p1:Phrase)
-MATCH (bob:Person {graph_name: 'my_graph', name: 'Bob'})-[:HAS_PHRASE]->(p2:Phrase)
+MATCH (alice:Person {name: 'Alice'})-[:HAS_PHRASE]->(p1:Phrase)
+MATCH (bob:Person {name: 'Bob'})-[:HAS_PHRASE]->(p2:Phrase)
 WHERE p1.text = p2.text
 RETURN p1.text, p1.weight AS alice_weight, p2.weight AS bob_weight
 ```
@@ -267,7 +266,7 @@ RETURN p1.text, p1.weight AS alice_weight, p2.weight AS bob_weight
 
 ```cypher
 // Get immediate neighbors (Markov blanket) of focal node
-MATCH (focal:Person {graph_name: 'my_graph', is_focal: true})
+MATCH (focal:Person {is_focal: true})
 MATCH (focal)-[:CONNECTED_TO]-(neighbor:Person)
 RETURN neighbor.name, neighbor.embedding
 ```
@@ -276,7 +275,7 @@ RETURN neighbor.name, neighbor.embedding
 
 ```cypher
 // Find recent interactions involving Alice
-MATCH (alice:Person {graph_name: 'my_graph', name: 'Alice'})
+MATCH (alice:Person {name: 'Alice'})
       <-[:INVOLVES]-(event:Event)
 WHERE event.type = 'past' AND event.date > '2024-01-01'
 MATCH (event)-[:INVOLVES]->(other:Person)
@@ -307,30 +306,27 @@ The implementation uses batch operations where possible:
 ### Query Optimization
 
 - Vector indexes are created automatically
-- Use `graph_name` in all queries for proper filtering
+- Single-graph model simplifies queries (no graph_name filtering needed)
 - Use parameterized queries to leverage query caching
 
 ## Migration Strategy
 
-To migrate from file-based to Neo4j storage:
+To migrate from file-based to Neo4j storage (single-graph model):
 
-1. **Pilot test**: Import a small ego graph first
+1. **Import your ego graph**: Run the import script
    ```bash
-   python scripts/import_to_neo4j.py test_graph --embedding-model openai
+   python scripts/import_to_neo4j.py --embedding-model openai
    ```
 
 2. **Validate**: Run analysis on both backends and compare results
    ```bash
-   uv run python src/semantic_flow.py test_graph  # File-based
-   python scripts/analyze_from_neo4j.py test_graph  # Neo4j-based
+   uv run python src/semantic_flow.py  # File-based
+   python scripts/analyze_from_neo4j.py  # Neo4j-based
    ```
 
-3. **Migrate production graphs**: Import all graphs
+3. **Compare outputs**: Verify both produce identical `analysis_latest.json` files
    ```bash
-   for graph in data/ego_graphs/*/; do
-     name=$(basename "$graph")
-     python scripts/import_to_neo4j.py "$name" --embedding-model openai
-   done
+   diff data/analyses/analysis_latest.json <path-to-neo4j-output>
    ```
 
 4. **Keep both backends**: JSON files remain source of truth, Neo4j as performance layer
