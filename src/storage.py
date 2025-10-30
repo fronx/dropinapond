@@ -23,7 +23,7 @@ class EgoData:
     nodes: list of node IDs including F and its neighbors (strings or ints).
     focal: the ID of the focal node (e.g., "F").
     embeddings: dict node_id -> np.ndarray of shape (d,)
-    edges: iterable of (u, v, dims) where dims is a dict with edge dimensions:
+    edges: list of (u, v, dims) where dims is a dict with edge dimensions:
            - 'potential': derived from embedding similarity (default)
            - 'actual': real interaction strength (optional)
            - 'past', 'present', 'future': temporal dimensions (optional)
@@ -33,7 +33,7 @@ class EgoData:
     nodes: List[str]
     focal: str
     embeddings: Dict[str, np.ndarray]
-    edges: Iterable[Tuple[str, str, Optional[float | Dict[str, float]]]]
+    edges: List[Tuple[str, str, Optional[float | Dict[str, float]]]]
     names: Optional[Dict[str, str]] = None
 
     def graph(self, edge_dim: str = 'potential'):

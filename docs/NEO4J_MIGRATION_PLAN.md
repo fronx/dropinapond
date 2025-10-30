@@ -212,83 +212,78 @@ This change completes the UI/UX simplification for the single-graph model. Users
 
 **Next:** Proceed to Step 1 (refactor analyze() to accept EgoData).
 
-#### Step 1: Refactor `analyze()` to Accept `EgoData`
+#### Step 1: Refactor `analyze()` to Accept `EgoData` ✓
 
-**Current signature:**
-```python
-def analyze(params: Params) -> Path
-```
+**Status:** Completed 2025-10-30
 
-**New signature:**
-```python
-def analyze(ego_data: EgoData, params: AnalysisParams) -> AnalysisResult
-```
+**Changes implemented:**
 
-**Changes needed:**
-- Remove internal `load_ego_graph()` call from [src/semantic_flow.py:55](../src/semantic_flow.py#L55)
-- Accept `ego_data` parameter instead
-- Return structured `AnalysisResult` dataclass instead of file path
-- Keep all analysis computations unchanged
+1. **Created new dataclasses** in [src/semantic_flow.py](../src/semantic_flow.py):
+   - `AnalysisParams`: Parameters for analysis (renamed from `Params`)
+   - `AnalysisResult`: Structured container holding all computed metrics (S, A, W, F, D, F_MB, E_MB, clusters, suggestions, coherence, phrase data)
 
-**Files to modify:**
-- [src/semantic_flow.py](../src/semantic_flow.py): Refactor `analyze()` function
-- Create new dataclass for `AnalysisResult` to hold all computed fields
+2. **Refactored `analyze()` function**:
+   - **Old:** `analyze(params: Params) -> Path`
+   - **New:** `analyze(ego_data: EgoData, params: AnalysisParams, embedding_service) -> AnalysisResult`
+   - Removed internal `load_ego_graph()` call
+   - Now accepts `EgoData` from any source (files or Neo4j)
+   - Returns structured data instead of writing files
 
-#### Step 2: Simplify JSON Analysis Storage
+3. **Updated `build_structural_matrix()`** in [src/semantic_flow/structural.py](../src/semantic_flow/structural.py):
+   - Removed old file-based version that read `edges.json`
+   - New version accepts `edges` list from `EgoData`
+   - Handles all edge formats: `(u, v)`, `(u, v, w)`, `(u, v, dims)`
+   - Fixed type: changed `EgoData.edges` from `Iterable` to `List[Tuple]`
 
-**Current behavior:**
-- Analysis writes to `data/analyses/fronx_latest.json` and timestamped files
-- Graph name embedded in filename
+4. **Created `save_analysis_to_json()` helper**:
+   - Separates computation from I/O
+   - Uses existing `build_analysis_output()` and `write_analysis()` functions
+   - Single-graph model: writes to `analysis_latest.json` and timestamped files
 
-**New behavior (single-graph model):**
-- Analysis writes to `data/analyses/latest.json` and timestamped files
-- No graph name in filename (only one graph exists)
+5. **Updated main block**:
+   - Clean separation: load `EgoData` → run `analyze()` → save results
+   - Works with file-based storage (Neo4j integration next step)
 
-**Functions to update:**
+**Testing:**
+- ✅ File-based analysis pipeline works correctly
+- ✅ Output files created with proper naming (`analysis_latest.json`, `analysis_YYYYMMDD_HHMMSS.json`)
+- ✅ All type errors resolved
+- ✅ Analysis output identical to previous version
 
-```python
-# In src/semantic_flow.py or new src/analysis_storage.py
-def save_analysis_to_json(analysis: AnalysisResult, output_dir: Path) -> Path
-    # Writes to output_dir/latest.json and output_dir/YYYYMMDD_HHMMSS.json
-    # No graph name needed
+**Actual time:** ~1 hour
 
-def load_analysis_from_json(analyses_dir: Path) -> AnalysisResult
-    # Loads from analyses_dir/latest.json
-    # No graph name parameter needed
-```
+**Next:** Step 2 is already complete (from Phase 2 Step 0). Proceed to Step 3 (update scripts to use new architecture).
 
-**Design considerations:**
-- Keep existing JSON format structure (for GUI compatibility)
-- Remove `graph_name` field from JSON output
-- Simpler filenames: `latest.json` instead of `fronx_latest.json`
+#### Step 2: Simplify JSON Analysis Storage ✓
+
+**Status:** Completed in Phase 2 Step 0 (see above)
+
+This step was already completed as part of the single-graph model simplification.
 
 #### Step 3: Update Scripts to Use New Architecture
 
-**[scripts/analyze_from_neo4j.py](../scripts/analyze_from_neo4j.py):**
-```python
-# Load ego graph from Neo4j (single graph, no name needed)
-ego_data = load_ego_graph_from_neo4j()
+**Goal:** Enable Neo4j-based analysis using the refactored `analyze()` function.
 
-# Run analysis (now accepts ego_data)
-analysis_result = analyze(ego_data, params)
+**Tasks:**
 
-# Save to JSON (analysis stays in JSON files)
-save_analysis_to_json(analysis_result, output_dir)
-```
+1. **Update [scripts/analyze_from_neo4j.py](../scripts/analyze_from_neo4j.py)**:
+   ```python
+   # Load ego graph from Neo4j (single graph, no name needed)
+   ego_data = load_ego_graph_from_neo4j()
 
-**[src/semantic_flow.py](../src/semantic_flow.py) main block:**
-```python
-# Load from files (single graph at data/ego_graphs/)
-ego_data = load_ego_graph(ego_graphs_dir, embedding_service)
+   # Run analysis (now accepts ego_data)
+   analysis_result = analyze(ego_data, params, embedding_service)
 
-# Run analysis
-analysis_result = analyze(ego_data, params)
+   # Save to JSON (analysis stays in JSON files)
+   save_analysis_to_json(analysis_result, output_dir)
+   ```
 
-# Save to JSON
-save_analysis_to_json(analysis_result, output_dir)
-```
+2. **Test Neo4j-based analysis**:
+   - Load graph from Neo4j
+   - Run analysis
+   - Verify JSON output identical to file-based analysis
 
-**Key point:** Both scripts produce identical JSON output. The only difference is where the graph data comes from (files vs Neo4j).
+**Key benefit:** Both file-based and Neo4j-based pipelines now use the same `analyze()` function. The only difference is the source of `EgoData` (files vs Neo4j).
 
 #### Step 4: Create FastAPI Backend
 
