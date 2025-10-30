@@ -137,7 +137,7 @@ To build an ego graph with phrase-level embeddings:
 Embeddings are computed automatically when you run analysis:
 
 ```bash
-uv run python src/semantic_flow.py <name>
+uv run python src/semantic_flow.py
 ```
 
 See [CONVERSATIONAL_INTERFACE.md](CONVERSATIONAL_INTERFACE.md) for building graphs through dialogue.

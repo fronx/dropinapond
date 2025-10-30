@@ -82,13 +82,14 @@ It's **distributed and privacy-preserving**: each person runs local computations
 
 ## Quick Start
 
-If you just want to see it work:
+To run the analysis:
+
 ```bash
 uv sync
-uv run python src/semantic_flow.py fronx
+uv run python src/semantic_flow.py
 ```
 
-This analyzes the example ego graph and outputs all navigation metrics.
+This analyzes your ego graph and outputs all navigation metrics.
 
 ## For Different Audiences
 
