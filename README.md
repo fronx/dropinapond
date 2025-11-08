@@ -6,30 +6,50 @@ A **semantic network navigation system** for understanding and strategically nav
 
 ## Quick Start
 
-### Option 1: Visual Interface (with API Backend)
-
-The GUI connects to a FastAPI backend that auto-detects your data source:
+### Easiest: One Command to Run Everything
 
 ```bash
-# Terminal 1: Start the backend server
+# Install dependencies (first time only)
 uv sync
-uv run uvicorn server.main:app --reload --port 3001
+cd gui && npm install && cd ..
 
-# Terminal 2: Start the GUI
-cd gui
-npm install
-npm run dev
+# Start both backend and frontend
+./start.sh
+```
+
+Then open **http://localhost:5173/** in your browser.
+
+The startup script will:
+1. Check Neo4j connectivity (auto-resumes if paused)
+2. Start the FastAPI backend on port 3002
+3. Start the frontend dev server on port 5173
+4. Display the URL to open
+
+Press Ctrl+C to stop both servers.
+
+### Manual Start (Two Terminals)
+
+If you prefer to run the servers separately:
+
+```bash
+# Terminal 1: Start the backend
+./server.sh
+
+# Terminal 2: Start the frontend
+cd gui && npm run dev
 ```
 
 Then open `http://localhost:5173/` to view your ego graph.
 
-**Single decision point - backend environment variables:**
-- With Neo4j credentials (`.env`: `NEO4J_ID`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`): Backend loads from Neo4j
-- Without Neo4j credentials: Backend loads from file-based storage in `data/ego_graph/`
+**Data Source Configuration:**
 
-The GUI always connects to the backend API and doesn't need to know which data source is active.
+The backend auto-detects which data source to use:
+- With Neo4j credentials in `.env`: Loads from Neo4j Aura (cloud database)
+- Without Neo4j credentials: Loads from file-based storage in `data/ego_graph/`
 
-See [gui/README.md](gui/README.md) for GUI details.
+To configure, copy `.env.example` to `.env` and fill in your credentials. See [.env.example](.env.example) for all options.
+
+See [gui/README.md](gui/README.md) for GUI details and [docs/NEO4J_BACKEND.md](docs/NEO4J_BACKEND.md) for Neo4j setup.
 
 ### Option 2: Conversational Interface
 
